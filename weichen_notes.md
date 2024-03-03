@@ -18,7 +18,39 @@
   Segmentation fault (core dumped)
   ```
 - Using local docker image: https://carla.readthedocs.io/en/latest/build_docker/
+
   - https://hub.docker.com/layers/carlasim/carla/0.9.15/images/sha256-1af47c314443f4a2d0869ac399c5b5eabde138a5bc39dd31dcbb1540e22f5588?context=explore
+
   ```bash
-  sudo docker run --privileged --gpus all --net=host -e DISPLAY=$DISPLAY carlasim/carla:0.9.12 /bin/bash ./CarlaUE4.sh
+  arch -x86_64 /bin/bash
+
+  sudo docker run --privileged --gpus all --net=host -e DISPLAY=$DISPLAY carlasim/carla:0.9.15 /bin/bash ./CarlaUE4.sh
   ```
+
+  Running via docker image on mac gives architecture error:
+
+  ```bash
+  (base) weichen@weichens-air ~ % sudo docker run --privileged --gpus all --net=host -e DISPLAY=$DISPLAY -e SDL_VIDEODRIVER=x11 -v /tmp/.X11-unix:/tmp/.X11-unix:rw carlasim/carla:0.9.15 /bin/bash ./CarlaUE4.sh -vulkan
+
+  WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+  docker: Error response from daemon: could not select device driver "" with capabilities: [[gpu]].
+  ERRO[0000] error waiting for container: context canceled
+  (base) weichen@weichens-air ~ % docker run -e DISPLAY=$DISPLAY --net=host --gpus all --runtime=nvidia carlasim/carla:<version> /bin/bash CarlaUE4.sh -opengl
+  zsh: no such file or directory: version
+  ```
+
+  ```bash
+  bash-3.2$ sudo docker run --privileged --gpus all --net=host -e DISPLAY=$DISPLAY -e SDL_VIDEODRIVER=x11 -v /tmp/.X11-unix:/tmp/.X11-unix:rw carlasim/carla:0.9.15 /bin/bash ./CarlaUE4.sh -vulkan
+
+  WARNING: The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+  docker: Error response from daemon: could not select device driver "" with capabilities: [[gpu]].
+  bash-3.2$
+  bash-3.2$ docker run -e DISPLAY=$DISPLAY --net=host --gpus all --runtime=nvidia carlasim/carla:<version> /bin/bash CarlaUE4.sh -opengl
+  bash: version: No such file or directory
+  bash-3.2$ docker run -e DISPLAY=$DISPLAY --net=host --gpus all --runtime=nvidia carlasim/carla:<version> /bin/bash CarlaUE4.sh -opengl
+  bash: version: No such file or directory
+  ```
+
+```
+
+```
