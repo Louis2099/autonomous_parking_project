@@ -1,1 +1,12 @@
+# Python 3.7
 ultralytics~=8.1.21
+pygame
+carla
+
+
+future
+numpy; python_version < '3.0'
+numpy==1.18.4; python_version >= '3.0'
+matplotlib
+open3d
+Pillow

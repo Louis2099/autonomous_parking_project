@@ -1,3 +1,15 @@
+- Install steps:
+
+1. Install Python 3.7
+  - Pip upgrade as needed: `python -m pip install --upgrade pip`
+2. Pip install:
+
+```
+pip install requirements.txt
+```
+
+3. Install VSCode (if not exist), then connect with Liveshare
+
 - Switch to x86_64: `/usr/bin/arch -x86_64 /bin/zsh`
 
 - Running carla:
@@ -58,3 +70,12 @@ Segmentation fault (core dumped)
    bash-3.2$ docker run -e DISPLAY=$DISPLAY --net=host --gpus all --runtime=nvidia carlasim/carla:<version> /bin/bash CarlaUE4.sh -opengl
    bash: version: No such file or directory
    ```
+
+
+# Errors
+-[No module named 'torch' or 'torch.C'](https://stackoverflow.com/questions/50203945/no-module-named-torch-or-torch-c)
+  - `pip uninstall torch` and then `pip install torch`
+-   File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.7_3.7.2544.0_x64__qbz5n2kfra8p0\lib\ctypes\__init__.py", line 364, in __init__
+    self._handle = _dlopen(self._name, mode)
+OSError: [WinError 126] The specified module could not be found
+  - `pip uninstall scipy` and then `pip install scipy`
