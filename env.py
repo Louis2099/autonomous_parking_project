@@ -3,22 +3,36 @@ import os
 import sys
 import queue
 import numpy as np
-import cv2
 import time
 import math
-path_to_carla = os.path.expanduser("~/carla/carla_0_9_15")
+import getpass
 
+user = getpass.getuser() # computer user
+
+# Set the path to the carla folder
+if user == "wqiu2":
+    path_to_carla = "D:\\carla"
+else:
+    path_to_carla = os.path.expanduser("~/carla/carla_0_9_15")
+print("path_to_carla:", path_to_carla)
+
+# Add the carla library to the Python path
 sys.path.append(glob.glob(path_to_carla + '/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
     sys.version_info.major,
     sys.version_info.minor,
     'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
-sys.path.append("/home/ubuntu/carla/carla_0_9_15/PythonAPI/carla")
+sys.path.append(path_to_carla + "/PythonAPI/carla")
+
+# Import carla after setting the Python path
 import carla
 from agents.navigation.basic_agent import BasicAgent
 
 
 
 def load_custom_map(xodr_path, client):
+    """
+    Load map from xodr file
+    """
     if os.path.exists(xodr_path):
         with open(xodr_path, encoding='utf-8') as od_file:
             try:
@@ -45,6 +59,10 @@ def load_custom_map(xodr_path, client):
     return world
 
 def euclidean_distance(point1, point2):
+    """
+    Calculate the euclidean distance between two points
+    Returns: sqrt((x2-x1)^2 + (y2-y1)^2)
+    """
     x1, y1 = point1
     x2, y2 = point2
 
@@ -69,8 +87,6 @@ class carla_env():
         new_spawn_point = self.get_start_point()
         self.vehicle = self.world.spawn_actor(bp, new_spawn_point)
         self.actor_list.append(self.vehicle)
-        
-        
         
     def setting_camera(self):
         camera = carla.sensor.Camera('MyCamera', PostProcessing='SceneFinal')
@@ -200,6 +216,7 @@ def osm_to_xodr(osm_path):
     # Define the desired settings. In this case, default values.
     settings = carla.Osm2OdrSettings()
     # Set OSM road types to export to OpenDRIVE
+    # NOTE: parking lanes are 'service' roads
     settings.set_osm_way_types(["motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link", "tertiary", "tertiary_link", "unclassified", "residential", "service"])
     # Convert to .xodr
     xodr_data = carla.Osm2Odr.convert(osm_data, settings)
@@ -217,7 +234,11 @@ if __name__ == '__main__':
     #osm_to_xodr(osm_path)
     #['Town04','Town05']
     default_map = 'Town05'
-    port = 6000
+
+    if user == "wqiu2":
+        port = 2000
+    else:
+        port = 6000
     env = carla_env(port, default_map, xodr_path)
     
     #spectate(env)
