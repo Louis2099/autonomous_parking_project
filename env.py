@@ -6,6 +6,7 @@ import numpy as np
 import time
 import math
 import getpass
+import random
 
 user = getpass.getuser() # computer user
 
@@ -71,8 +72,8 @@ def euclidean_distance(point1, point2):
 
 
 
-class carla_env():
-    def __init__(self, port, default_map=None, xodr_path = None):
+class CarlaEnv():
+    def __init__(self, port, tm_port, default_map=None, n_vehicles=0, n_walkers = 0):
         self.client = carla.Client("localhost", port)
         self.client.set_timeout(10.0)
         self.world = self.client.load_world(default_map)
@@ -80,14 +81,148 @@ class carla_env():
         self.actor_list = []
         self.blueprint_library = self.world.get_blueprint_library()
         self.dest = None
+
+        self.traffic_manager = self.client.get_trafficmanager(tm_port)
+
+        self.spawn(n_vehicles, n_walkers)
+        self.set_world_settings()
         
-    def spawn(self):
-        bp = self.blueprint_library.filter('model3')[0]
-        new_spawn_point = self.world.get_map().get_spawn_points()[1]
-        new_spawn_point = self.get_start_point()
-        self.vehicle = self.world.spawn_actor(bp, new_spawn_point)
+    def _get_spawn_point(self):
+            # Generate spawn point
+            spawn_point = carla.Transform()
+            # Get the start point
+            start_transform = self.get_start_point()
+            start_location = start_transform.location
+
+            # Generate a random location within a certain radius of the start point
+            radius = 50  # radius in meters
+            angle = np.random.uniform(0, 2*math.pi)  # random angle
+            distance = np.random.uniform(0, radius)  # random distance within radius
+            loc = carla.Location(x=start_location.x + distance * math.cos(angle),
+                                y=start_location.y + distance * math.sin(angle),
+                                z=start_location.z)
+            spawn_point.location = loc
+            return spawn_point
+    
+    def spawn(self, n_vehicles=0, n_walkers=0):
+        """
+        Spawn actors in the world
+        """
+        # --------------
+        # Spawn ego/hero vehicle
+        # --------------
+        ego_vehicle_bp = self.blueprint_library.filter('model3')[0]
+        ego_vehicle_bp.set_attribute('role_name', 'hero')
+        spawn_point = self.get_start_point()
+        self.vehicle = self.world.spawn_actor(ego_vehicle_bp, spawn_point)
         self.actor_list.append(self.vehicle)
+
+        # --------------
+        # Spawn vehicles
+        # https://github.com/carla-simulator/carla/blob/0.9.15/PythonAPI/examples/generate_traffic.py#L222-L257
+        # --------------
+        batch = []
+        vehicles_list = []
+        vehicle_bps = self.blueprint_library.filter("vehicle.*")
+        for i in range(n_vehicles):
+            vehicle_bp = random.choice(vehicle_bps)
+            if vehicle_bp.has_attribute('color'):
+                color = random.choice(vehicle_bp.get_attribute('color').recommended_values)
+                vehicle_bp.set_attribute('color', color)
+            if vehicle_bp.has_attribute('driver_id'):
+                driver_id = random.choice(vehicle_bp.get_attribute('driver_id').recommended_values)
+                vehicle_bp.set_attribute('driver_id', driver_id)
+            vehicle_bp.set_attribute('role_name', 'autopilot')
+
+            spawn_point = self._get_spawn_point()
+            # spawn the cars and set their autopilot and light state all together
+            batch.append(carla.command.SpawnActor(vehicle_bp, spawn_point)
+                .then(carla.command.SetAutopilot(carla.command.FutureActor, True,  
+                                                 self.traffic_manager.get_port())))
+
+        for result in self.client.apply_batch_sync(batch, True):
+            if result.error:
+                print(f"[ERROR] Failed to spawn vehicle: {result.error}")
+            else:
+                vehicles_list.append(result.actor_id)
+
         
+        # --------------
+        # Spawn Walkers
+        # https://github.com/carla-simulator/carla/blob/0.9.15/PythonAPI/util/performance_benchmark.py#L277-L330
+        # https://carla.readthedocs.io/en/0.9.15/core_actors/#:~:text=vehicle.set_light_state(current_lights)-,Walkers,-carla.Walker%20work
+        # --------------
+        walkers_list = []
+
+        if n_walkers > 0:
+            # (1) Spawn walker actors
+            batch = []
+            walker_speed = []
+            walker_bps = self.blueprint_library.filter("walker.pedestrian.*")
+            # Keep looping until we have enough walkers
+            for i in range(n_walkers):
+                # Randomly choose a walker model
+                walker_bp = random.choice(walker_bps)
+                # set as not invincible
+                if walker_bp.has_attribute('is_invincible'):
+                    walker_bp.set_attribute('is_invincible', 'false')
+                # set the max speed
+                if walker_bp.has_attribute('speed'):
+                    # walking
+                    walker_speed.append(walker_bp.get_attribute('speed').recommended_values[1])
+                else:
+                    print("Walker has no speed")
+                    walker_speed.append(0.0)
+                spawn_point = self._get_spawn_point()
+                batch.append(carla.command.SpawnActor(walker_bp, spawn_point))
+            # Apply the actors
+            for result in self.client.apply_batch_sync(batch, True):
+                if result.error:
+                    print("[ERROR] Failed to spawn walker actor:", result.error)
+                else:
+                    walkers_list.append({"id": result.actor_id, "speed": walker_speed[i]})
+            
+            # (2) Spawn walker controllers
+            batch = []
+            walker_controller_bp = self. world.get_blueprint_library().find('controller.ai.walker')
+            for walker in walkers_list:
+                batch.append(carla.command.SpawnActor(walker_controller_bp, carla.Transform(), walker["id"]))
+            # Apply the controllers
+            for i, result in enumerate(self.client.apply_batch_sync(batch, True)):
+                if result.error:
+                    print("[ERROR] Failed to spawn walker controller:", result.error)
+                else:
+                    walkers_list[i]["contr_id"] = result.actor_id
+
+            # (3) initialize each controller and set target to walk to (list is [controler, actor, controller, actor ...])
+            # Set how many pedestrians can cross the road
+            self.world.set_pedestrians_cross_factor(0.5)
+
+            walker_contr_ids = [w["contr_id"] for w in walkers_list]
+            # Flatten the nested list using numpy
+            controller_actors = self.world.get_actors(walker_contr_ids)
+
+            # ensures client has received the last transform of the walkers we have just created
+            self.world.tick()
+
+            for i, actor in enumerate(controller_actors):
+                # start walker
+                actor.start()
+                # set walk to random point
+                actor.go_to_location(self.world.get_random_location_from_navigation())
+                # max speed
+                actor.set_max_speed(float(walker_speed[i]))
+
+            print(f"Spawned {len(walkers_list)} walkers")
+
+
+
+    def set_world_settings(self):
+        spectator = self.world.get_spectator()
+        transform = self.vehicle.get_transform()
+        spectator.set_transform(carla.Transform(transform.location + carla.Location(z=50),
+        carla.Rotation(pitch=-90)))
+
     def setting_camera(self):
         camera = carla.sensor.Camera('MyCamera', PostProcessing='SceneFinal')
         camera.set(FOV=90.0)
@@ -208,6 +343,10 @@ def spectate(env):
         time.sleep(1)
         
 def osm_to_xodr(osm_path):
+    """
+    Convert .osm file to .xodr file
+    https://carla.readthedocs.io/en/latest/tuto_G_openstreetmap/
+    """
     f = open(osm_path, 'r')
     xodr_path = osm_path.split('.')[0] + '.' + 'xodr'
     osm_data = f.read()
@@ -239,14 +378,19 @@ if __name__ == '__main__':
         port = 2000
     else:
         port = 6000
-    env = carla_env(port, default_map, xodr_path)
-    
+    tm_port = 2001
+    n_walkers = 50 # pedestrians
+    n_vehicles = 50
+    env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
+
     #spectate(env)
     
     
     env.path_planning()
     env.mark_parking_spots()
-    #env.spawn()
     #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
     #env.drive()
     
+    print("Started simulation. Infinity looping\nCtrl+C to exit")
+    while True:
+        env.world.tick()
