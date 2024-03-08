@@ -7,6 +7,10 @@ import time
 import math
 import getpass
 import random
+import cv2
+from ultralytics import YOLO
+from ultralytics.utils.plotting import Annotator 
+
 
 user = getpass.getuser() # computer user
 
@@ -86,6 +90,7 @@ class CarlaEnv():
 
         self.spawn(n_vehicles, n_walkers)
         self.set_world_settings()
+        self.init_sensors()
         
     def _get_spawn_point(self):
             # Generate spawn point
@@ -124,6 +129,7 @@ class CarlaEnv():
         batch = []
         vehicles_list = []
         vehicle_bps = self.blueprint_library.filter("vehicle.*")
+        
         for i in range(n_vehicles):
             vehicle_bp = random.choice(vehicle_bps)
             if vehicle_bp.has_attribute('color'):
@@ -218,10 +224,24 @@ class CarlaEnv():
 
 
     def set_world_settings(self):
+        # Set starting location of the spectator camera
         spectator = self.world.get_spectator()
         transform = self.vehicle.get_transform()
         spectator.set_transform(carla.Transform(transform.location + carla.Location(z=50),
         carla.Rotation(pitch=-90)))
+
+        # Set weather of the world
+        weather = carla.WeatherParameters(
+            cloudiness=0.0,
+            precipitation=0.0,
+            sun_altitude_angle=10.0,
+            sun_azimuth_angle = 70.0,
+            precipitation_deposits = 0.0,
+            wind_intensity = 0.0,
+            fog_density = 0.0,
+            wetness = 0.0, 
+        )
+        self.world.set_weather(weather)
 
     def setting_camera(self):
         camera = carla.sensor.Camera('MyCamera', PostProcessing='SceneFinal')
@@ -332,7 +352,138 @@ class CarlaEnv():
             result = [[x, y, self.vacancy_matrix[x][y]]]
         
         return result
+    
+    def init_sensors(self):
+        """
+        Get the perception of the environment
+        https://medium.com/@parthanvelanjeri/a-dip-into-carla-iii-camera-and-other-sensors-484fa039063c
+        """
+        img_width = 640
+        img_height = 480
+        self.sensor_data = {"rgb_img": np.zeros((img_width, img_height, 4)),
+                            'depth_img': np.zeros((img_width, img_height, 4)),
+                            "yolo_results": []}
+        conf_threshold = 50 # confidence threshold
 
+        model = YOLO("yolov8n.pt")  # pretrained YOLOv8n model
+
+        # Camera and lidar generation based on this: https://github.com/mjxu96/carlaviz/blob/0.9.15/examples/example.py#L63-L87
+        # Attach a camera and a lidar to the ego vehicle
+        # RGB Camera
+        def rgb_callback(image):
+            rgba_img = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4)) #Reshaping with alpha channel
+            rgba_img[:,:,3] = 255 #Setting the alpha to 255 
+
+            # Run batched inference on a list of images
+            rgb_img = rgba_img[:, :, :3]  # only want 3 channels
+            results = model(rgb_img)  # only want 3 channels
+
+            yolo_results = []
+            # Process results list
+            # https://stackoverflow.com/a/75332799
+            for r in results:
+                annotator = Annotator(np.ascontiguousarray(rgb_img))
+                boxes = r.boxes
+                for box in boxes:
+                    b = box.xyxy[0]  # get box coordinates in (left, top, right, bottom) format
+                    c = box.cls # class index
+                    obj = model.names[int(c)]
+                    conf = box.conf.item()*100 # confidence
+                    if conf < conf_threshold:
+                        continue # skip if confidence is too low
+
+                    if obj in ["car", "truck", "bus"] :
+                        color = (0, 100, 0) # green
+                    elif obj in ["person", "dog", "cat"]:
+                        color = (0, 0, 255) # red
+                    elif obj in ["bicycle", "motorcycle"]:
+                        color = (255, 0, 0) # blue
+                    else:
+                        color = (128, 128, 128) # grey
+                    annotator.box_label(b, obj +" "+ str(round(conf))+"%",
+                                        color=color)
+                    
+                    yolo_results.append({"obj": obj, "conf": conf, "box": b})
+
+            img_with_boxes = annotator.result()  
+            self.sensor_data['rgb_img'] = img_with_boxes
+            self.sensor_data['yolo_results'] = yolo_results
+
+
+        blueprint_camera = self.blueprint_library.find("sensor.camera.rgb")
+        blueprint_camera.set_attribute("image_size_x", str(img_width))  
+        blueprint_camera.set_attribute("image_size_y", str(img_height))
+        blueprint_camera.set_attribute("fov", "110")
+        blueprint_camera.set_attribute("sensor_tick", "0.1")
+
+        # Position relative to vehicle's center
+        # x is front/back, y is left/right, z is up/down
+        transform_camera = carla.Transform(carla.Location(x=1.0, y=+0.0, z=1.5)) 
+        
+        camera = self.world.spawn_actor(
+            blueprint_camera, transform_camera, attach_to=self.vehicle
+        )
+        camera.listen(lambda data: rgb_callback(data))
+        self.actor_list.append(camera)
+
+        # Depth camera
+        def depth_callback(image):
+            image.convert(carla.ColorConverter.LogarithmicDepth) # Make it logarithmic depth (gray scale)
+            image = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
+
+            annotator = Annotator(np.ascontiguousarray(image))
+            for r in self.sensor_data['yolo_results']:
+                box = r['box']  # get box coordinates in (left, top, right, bottom) format
+                obj = r['obj']
+                conf = r['conf']
+
+                (left, top, right, bottom) = (int(box[0]), int(box[1]), int(box[2]), int(box[3]))
+
+                # Extract the area within the bounding box
+                bbox_area = image[top:bottom, left:right]
+
+                """
+                https://carla.readthedocs.io/en/0.9.15/ref_sensors/
+                The image codifies depth value per pixel using 3 channels of the RGB color space, from less to more significant bytes: R -> G -> B. The actual distance in meters can be decoded with:
+
+                normalized = (R + G * 256 + B * 256 * 256) / (256 * 256 * 256 - 1)
+                in_meters = 1000 * normalized
+                """
+                R = bbox_area[:, :, 0]
+                G = bbox_area[:, :, 1]
+                B = bbox_area[:, :, 2]
+                normalized = (R + G * 256 + B * 256 * 256) / (256 * 256 * 256 - 1)
+                depth_in_cm = 1000 * normalized * 100 # in cm
+                depth = np.mean(depth_in_cm)  # average depth in the bounding box
+
+                # Larger depth means further away
+                if depth > 100:
+                    color = (0, 100, 0) # green
+                elif depth <= 50:
+                    color = (0, 0, 255) # red
+                else:
+                    color = (0, 165, 255) # orange
+
+                annotator.box_label(box, str(int(depth))+"cm", color=color)
+                
+            img_with_boxes = annotator.result()  
+            self.sensor_data['depth_img'] = img_with_boxes
+
+        blueprint_camera = self.blueprint_library.find("sensor.camera.depth")
+        blueprint_camera.set_attribute("image_size_x", str(img_width))  
+        blueprint_camera.set_attribute("image_size_y", str(img_height))
+        blueprint_camera.set_attribute("fov", "110")
+        blueprint_camera.set_attribute("sensor_tick", "0.1")
+        # Position relative to vehicle's center
+        # x is front/back, y is left/right, z is up/down
+        camera = self.world.spawn_actor(
+            blueprint_camera, transform_camera, attach_to=self.vehicle
+        )
+        camera.listen(lambda data: depth_callback(data))
+        self.actor_list.append(camera)
+
+        print("Sensors initialized")
+    
 
 def spectate(env):
     while(True):
@@ -391,6 +542,16 @@ if __name__ == '__main__':
     #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
     #env.drive()
     
-    print("Started simulation. Infinity looping\nCtrl+C to exit")
+    print("Started simulation. Infinite looping\nCtrl+C to exit")
     while True:
         env.world.tick()
+        env.world.wait_for_tick()
+
+        # Output camera display onto an OpenCV Window
+        cv2.imshow("RGB Camera (press q to exit)", env.sensor_data['rgb_img'])
+        cv2.imshow("Depth Camera (press q to exit)", env.sensor_data['depth_img'])
+        # Exit with q or ctrl+c
+        if cv2.waitKey(1) == ord('q'):
+            break
+
+    cv2.destroyAllWindows()

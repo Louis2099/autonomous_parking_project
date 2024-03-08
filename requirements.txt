@@ -12,3 +12,4 @@ open3d
 Pillow
 networkx
 shapely
+opencv-python
