@@ -3,6 +3,10 @@ import numpy as np
 
 from scipy.spatial.transform import Rotation as Rot
 
+'''
+Modify these vehicle parameters before use
+'''
+
 WB = 3.0  # wheel base length
 W = 2.0  # width of car
 LF = 3.3  # distance from rear to vehicle front end
@@ -61,6 +65,5 @@ def move(x, y, yaw, distance, steer, L=WB):
     x += distance * cos(yaw)
     y += distance * sin(yaw)
     yaw += pi_2_pi(distance * tan(steer) / L)  # distance/2
-    # yaw += pi_2_pi(steer) 
 
     return x, y, yaw

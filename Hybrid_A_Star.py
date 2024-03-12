@@ -1,4 +1,6 @@
 '''
+Modify vehicle parameters in Kinetic_Model berfore use!
+
 Usage: call: path = hybrid_a_star_planning(start, goal, ox, oy, xy_resolution, yaw_resolution)
     
     Parameters:
