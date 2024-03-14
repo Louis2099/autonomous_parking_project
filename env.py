@@ -362,8 +362,6 @@ class CarlaEnv():
         return result
     
     
-
-
     def park(self, goal, ox, oy):
         
         startx = carla.Actor.get_location(self).x
@@ -394,13 +392,7 @@ class CarlaEnv():
                     Done = True
                     break
 
-
-
-
-
-    
-
-        
+              
 
 
 
@@ -593,6 +585,11 @@ if __name__ == '__main__':
     #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
     #env.drive()
     
+    goal = [50.0, 30.0, np.deg2rad(40.0)]  # Need to change to actual goal position
+    ox = [] # x position list of Obstacles [m]
+    oy = [] # y position list of Obstacles [m]
+    env.park(goal, ox, oy)
+
     print("Started simulation. Infinite looping\nCtrl+C to exit")
     while True:
         env.world.tick()
