@@ -82,6 +82,7 @@ class CarlaEnv():
         self.client.set_timeout(10.0)
         self.world = self.client.load_world(default_map)
         #self.world = load_custom_map(xodr_path, self.client)
+        self.path_planning()
         self.actor_list = []
         self.blueprint_library = self.world.get_blueprint_library()
         self.dest = None
@@ -93,21 +94,25 @@ class CarlaEnv():
         self.init_sensors()
         
     def _get_spawn_point(self):
-            # Generate spawn point
-            spawn_point = carla.Transform()
-            # Get the start point
-            start_transform = self.get_start_point()
-            start_location = start_transform.location
+        # Parking lot dimensions
+        min_x = -40
+        max_x = 18
+        min_y = -50
+        max_y = -15
+        # Generate spawn point
+        spawn_point = carla.Transform()
+        # Get the start point
+        start_transform = self.get_start_point()
+        start_location = start_transform.location
 
-            # Generate a random location within a certain radius of the start point
-            radius = 50  # radius in meters
-            angle = np.random.uniform(0, 2*math.pi)  # random angle
-            distance = np.random.uniform(0, radius)  # random distance within radius
-            loc = carla.Location(x=start_location.x + distance * math.cos(angle),
-                                y=start_location.y + distance * math.sin(angle),
-                                z=start_location.z)
-            spawn_point.location = loc
-            return spawn_point
+        # Generate a random location within the parking lot
+        loc = carla.Location(x=np.random.uniform(min_x, max_x),
+                            y=np.random.uniform(min_y, max_y),
+                            z=start_location.z)
+        spawn_point.location = loc
+        # Set rotation to be north to south
+        spawn_point.rotation = carla.Rotation(0, 0, 0)
+        return spawn_point
     
     def spawn(self, n_vehicles=0, n_walkers=0):
         """
@@ -119,8 +124,23 @@ class CarlaEnv():
         ego_vehicle_bp = self.blueprint_library.filter('model3')[0]
         ego_vehicle_bp.set_attribute('role_name', 'hero')
         spawn_point = self.get_start_point()
-        self.vehicle = self.world.spawn_actor(ego_vehicle_bp, spawn_point)
+        # testing
+        spawn_point = self.path[0]
+        
+        while True:
+            try:
+                self.vehicle = self.world.spawn_actor(ego_vehicle_bp, spawn_point)
+                print("Spawned ego vehicle at", spawn_point.location)
+                break
+            except Exception as collision:
+                print("Failed to spawn vehicle:", collision)
+                self.world.debug.draw_string(spawn_point.location, 'A', draw_shadow=False,
+                                       color=carla.Color(r=0, g=0, b=255), life_time=600,
+                                       persistent_lines=True)
+                spawn_point.location.x += 1
+                
         self.actor_list.append(self.vehicle)
+        return
 
         # --------------
         # Spawn vehicles
@@ -255,7 +275,7 @@ class CarlaEnv():
     
     def draw_path(self, life_time=900.0):
       for point in self.path:
-         self.world.debug.draw_string(point, 'O', draw_shadow=False,
+         self.world.debug.draw_string(point.location, 'O', draw_shadow=False,
                                        color=carla.Color(r=255, g=0, b=0), life_time=life_time,
                                        persistent_lines=True)
          
@@ -282,12 +302,12 @@ class CarlaEnv():
             [0, 1, 0, 0, 0, 0, 0, 1, 0, 0],
             [1, 1, 0, 0, 0, 0, 0, 0, 1, 1]
             ])
-        row_x = [self.path[0].x + 10, 
-                 self.path[2].x-3, 
-                 self.path[2].x+5, 
-                 self.path[4].x-3,
-                 self.path[4].x+5,
-                 self.path[6].x-5]
+        row_x = [self.ckp[0].x + 10, 
+                 self.ckp[2].x-3, 
+                 self.ckp[2].x+5, 
+                 self.ckp[4].x-3,
+                 self.ckp[4].x+5,
+                 self.ckp[6].x-5]
         
         col_y = np.arange(-45+self.width/2, -15-self.width/2, self.width)
         location_list = []
@@ -304,7 +324,7 @@ class CarlaEnv():
         
         
     def path_planning(self):
-        self.path = [carla.Location(-38, -30, 0), 
+        self.ckp = [carla.Location(-38, -30, 0), 
                      carla.Location(-38, -47, 0),
                      carla.Location(-19, -47, 0),
                      carla.Location(-19, -13, 0),
@@ -313,34 +333,41 @@ class CarlaEnv():
                      carla.Location(16, -47, 0),
                      carla.Location(16, -28, 0)
                      ]
+        self.path = []
+        step_size = 0.1
+        for ckp in self.ckp[:-1]:
+            delta_x = ckp.x - self.ckp[self.ckp.index(ckp)+1].x
+            delta_y = ckp.y - self.ckp[self.ckp.index(ckp)+1].y
+            if delta_x != 0:
+                yaw = 0
+                for i in range(int(abs(delta_x)/step_size)):
+                    self.path.append(carla.Transform(carla.Location(ckp.x + i*step_size, ckp.y, 0.5), carla.Rotation(0, yaw, 0)))
+            else:
+                if delta_y < 0:
+                    yaw = 90
+                    for i in range(int(abs(delta_y)/step_size)):
+                        self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y  + i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
+                else:
+                    yaw = -90
+                    for i in range(int(abs(delta_y)/step_size)):
+                        self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y - i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
+
         self.draw_path()
-        
-    def drive(self):
-        #TODO ZEQI
-        """
-        Enable the vechile to follow the search path
-        """
-        self.path_planning()
-        actor = self.vehicle
-        actor_agent = BasicAgent(actor)
-        
-        for dest in self.path:
-            Done = False
-            actor_agent.set_destination(dest)
-            while not Done:
-                actor.apply_control(actor_agent.run_step())
-                self.world.wait_for_tick()
-                v_loc = actor.get_location()
-                dist = euclidean_distance((v_loc.x, v_loc.y), (dest.x, dest.y))
-                print(f"DIST {dist}")
-                print(f"v_loc {v_loc}")
-                print(f"dest {dest}")
-                if dist<0.1:
-                    Done = True
-                    break
+
+    def drive(self, path):
+        for point in path:
+            try:
+                self.vehicle.set_transform(point)
+                time.sleep(0.001)
+            except Exception as collision:
+                print("Failed to move vehicle:", point.location)
+                continue
+
+    
+
     
     def search(self, vl_x, vl_y):
-        row_x = [self.path[0].x, self.path[2].x, 0, self.path[4].x, 0, self.path[6].x]
+        row_x = [self.ckp[0].x, self.ckp[2].x, 0, self.ckp[4].x, 0, self.ckp[6].x]
         col_y = [y for y in range(-45, -15, self.width)]
         x = np.argmin(np.asarray(row_x) - vl_x)
         y = np.argmin(np.asarray(col_y) - vl_y)
@@ -483,7 +510,28 @@ class CarlaEnv():
         self.actor_list.append(camera)
 
         print("Sensors initialized")
-    
+    """
+    def drive(self):
+        #TODO ZEQI
+        self.path_planning()
+        actor = self.vehicle
+        actor_agent = BasicAgent(actor)
+        
+        for dest in self.path:
+            Done = False
+            actor_agent.set_destination(dest)
+            while not Done:
+                actor.apply_control(actor_agent.run_step())
+                self.world.wait_for_tick()
+                v_loc = actor.get_location()
+                dist = euclidean_distance((v_loc.x, v_loc.y), (dest.x, dest.y))
+                print(f"DIST {dist}")
+                print(f"v_loc {v_loc}")
+                print(f"dest {dest}")
+                if dist<0.1:
+                    Done = True
+                    break
+    """
 
 def spectate(env):
     while(True):
@@ -537,8 +585,9 @@ if __name__ == '__main__':
     #spectate(env)
     
     
-    env.path_planning()
+    
     env.mark_parking_spots()
+    env.drive(env.path)
     #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
     #env.drive()
     
