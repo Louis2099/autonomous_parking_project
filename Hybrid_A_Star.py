@@ -26,7 +26,7 @@ import reeds_shepp as rs
 
 from Kinetic_Model import *
 
-XY_GRID_RESOLUTION = 2.0  # [m]
+XY_GRID_RESOLUTION = 0.5  # [m]
 YAW_GRID_RESOLUTION = np.deg2rad(5.0)  # [rad]
 MOTION_RESOLUTION = 0.08  # [m] path interpolate resolution
 N_STEER = 20             # number of steer command

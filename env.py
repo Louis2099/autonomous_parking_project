@@ -8,8 +8,10 @@ import math
 import getpass
 import random
 import cv2
+import Hybrid_A_Star
 from ultralytics import YOLO
 from ultralytics.utils.plotting import Annotator 
+
 
 
 user = getpass.getuser() # computer user
@@ -17,16 +19,22 @@ user = getpass.getuser() # computer user
 # Set the path to the carla folder
 if user == "wqiu2":
     path_to_carla = "D:\\carla"
+if user == "jiaze":
+    path_to_carla = "H:\\CARLA\\WindowsNoEditor"
+
 else:
     path_to_carla = os.path.expanduser("~/carla/carla_0_9_15")
 print("path_to_carla:", path_to_carla)
 
-# Add the carla library to the Python path
-sys.path.append(glob.glob(path_to_carla + '/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
-    sys.version_info.major,
-    sys.version_info.minor,
-    'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
-sys.path.append(path_to_carla + "/PythonAPI/carla")
+try:
+    # Add the carla library to the Python path
+    sys.path.append(glob.glob(path_to_carla + '/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
+        sys.version_info.major,
+        sys.version_info.minor,
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+    sys.path.append(path_to_carla + "/PythonAPI/carla")
+except IndexError:
+    pass
 
 # Import carla after setting the Python path
 import carla
@@ -316,7 +324,6 @@ class CarlaEnv():
         self.draw_path()
         
     def drive(self):
-        #TODO ZEQI
         """
         Enable the vechile to follow the search path
         """
@@ -338,6 +345,7 @@ class CarlaEnv():
                 if dist<0.1:
                     Done = True
                     break
+                
     
     def search(self, vl_x, vl_y):
         row_x = [self.path[0].x, self.path[2].x, 0, self.path[4].x, 0, self.path[6].x]
@@ -353,6 +361,49 @@ class CarlaEnv():
         
         return result
     
+    
+
+
+    def park(self, goal, ox, oy):
+        
+        startx = carla.Actor.get_location(self).x
+        starty = carla.Actor.get_location(self).x
+        startyaw = self.world.player.get_transform().rotation.yaw
+        start = [startx, starty, startyaw]
+        path = Hybrid_A_Star.hybrid_a_star_planning(start, goal, ox, oy, Hybrid_A_Star.XY_GRID_RESOLUTION, Hybrid_A_Star.YAW_GRID_RESOLUTION)
+
+        x = path.x_list
+        y = path.y_list
+
+        cpath = []
+        
+        agent = BasicAgent(self.vehicle)
+        for i in range(x):
+            cpath[i] = carla.Location(x[i], y[i], 0)
+        
+        for dest in cpath:
+            Done = False
+            agent.set_destination(dest)
+            while not Done:
+                self.vehicle.apply_control(agent.run_step())
+                
+                v_loc = self.vehicle.get_location()
+                dist = euclidean_distance((v_loc.x, v_loc.y), (dest.x, dest.y))
+                
+                if dist<0.1:
+                    Done = True
+                    break
+
+
+
+
+
+    
+
+        
+
+
+
     def init_sensors(self):
         """
         Get the perception of the environment
