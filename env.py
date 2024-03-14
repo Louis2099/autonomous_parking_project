@@ -86,6 +86,7 @@ class CarlaEnv():
         self.actor_list = []
         self.blueprint_library = self.world.get_blueprint_library()
         self.dest = None
+        self.obstacle_detected = False
 
         self.traffic_manager = self.client.get_trafficmanager(tm_port)
 
@@ -111,7 +112,7 @@ class CarlaEnv():
                             z=start_location.z)
         spawn_point.location = loc
         # Set rotation to be north to south
-        spawn_point.rotation = carla.Rotation(0, 0, 0)
+        spawn_point.rotation.yaw = 0
         return spawn_point
     
     def spawn(self, n_vehicles=0, n_walkers=0):
@@ -140,7 +141,6 @@ class CarlaEnv():
                 spawn_point.location.x += 1
                 
         self.actor_list.append(self.vehicle)
-        return
 
         # --------------
         # Spawn vehicles
@@ -247,7 +247,7 @@ class CarlaEnv():
         # Set starting location of the spectator camera
         spectator = self.world.get_spectator()
         transform = self.vehicle.get_transform()
-        spectator.set_transform(carla.Transform(transform.location + carla.Location(z=50),
+        spectator.set_transform(carla.Transform(transform.location + carla.Location(x=20, z=50),
         carla.Rotation(pitch=-90)))
 
         # Set weather of the world
@@ -353,16 +353,6 @@ class CarlaEnv():
                         self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y - i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
 
         self.draw_path()
-
-    def drive(self, path):
-        for point in path:
-            try:
-                self.vehicle.set_transform(point)
-                time.sleep(0.001)
-            except Exception as collision:
-                print("Failed to move vehicle:", point.location)
-                continue
-
     
 
     
@@ -459,10 +449,21 @@ class CarlaEnv():
             image = np.reshape(np.copy(image.raw_data), (image.height, image.width, 4))
 
             annotator = Annotator(np.ascontiguousarray(image))
+            
+            desired_objects = ["car", "truck", "bus", "person", "dog", "cat", "bicycle", "motorcycle"]
+
+            obj_detected = False
             for r in self.sensor_data['yolo_results']:
                 box = r['box']  # get box coordinates in (left, top, right, bottom) format
                 obj = r['obj']
                 conf = r['conf']
+
+                if obj not in desired_objects:
+                    continue # skip if object is not desired
+
+                # Only consider boxes that are within the middle third of the image
+                if box[0] < img_width//3 or box[2] > img_width*2//3:
+                    continue # skip if box is not in the middle third
 
                 (left, top, right, bottom) = (int(box[0]), int(box[1]), int(box[2]), int(box[3]))
 
@@ -484,14 +485,16 @@ class CarlaEnv():
                 depth = np.mean(depth_in_cm)  # average depth in the bounding box
 
                 # Larger depth means further away
-                if depth > 100:
-                    color = (0, 100, 0) # green
-                elif depth <= 50:
+                if depth <= 50:
                     color = (0, 0, 255) # red
+                    obj_detected = True
                 else:
-                    color = (0, 165, 255) # orange
+                    color = (0, 100, 0) # green
 
                 annotator.box_label(box, str(int(depth))+"cm", color=color)
+
+            self.obstacle_detected = obj_detected
+            
                 
             img_with_boxes = annotator.result()  
             self.sensor_data['depth_img'] = img_with_boxes
@@ -532,6 +535,15 @@ class CarlaEnv():
                     Done = True
                     break
     """
+    def drive(self, path):
+        for point in path:
+            try:
+                self.vehicle.set_transform(point)
+                time.sleep(0.001)
+            except Exception as collision:
+                print("Failed to move vehicle:", point.location)
+                continue
+
 
 def spectate(env):
     while(True):
@@ -578,8 +590,10 @@ if __name__ == '__main__':
     else:
         port = 6000
     tm_port = 2001
-    n_walkers = 50 # pedestrians
-    n_vehicles = 50
+
+    n_walkers = 30 # pedestrians
+    # n_vehicles = 10
+    n_vehicles = 0
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
 
     #spectate(env)
@@ -587,11 +601,14 @@ if __name__ == '__main__':
     
     
     env.mark_parking_spots()
-    env.drive(env.path)
+    # env.drive(env.path)
     #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
     #env.drive()
     
     print("Started simulation. Infinite looping\nCtrl+C to exit")
+
+    path_index = 0 # Which point vehicle is at in the path
+
     while True:
         env.world.tick()
         env.world.wait_for_tick()
@@ -602,5 +619,21 @@ if __name__ == '__main__':
         # Exit with q or ctrl+c
         if cv2.waitKey(1) == ord('q'):
             break
+
+        # Drive the vehicle along the path
+        if path_index < len(env.path):
+            if env.obstacle_detected:
+                print("Obstacle detected")
+                continue # skip this iteration if obstacle detected
+
+            point = env.path[path_index]
+            try:
+                env.vehicle.set_transform(point)
+                path_index +=1
+
+                # time.sleep(0.001)
+            except Exception as collision:
+                print("Failed to move vehicle:", point.location)
+                continue
 
     cv2.destroyAllWindows()
