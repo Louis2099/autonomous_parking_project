@@ -687,10 +687,13 @@ if __name__ == '__main__':
     print("Started simulation. Infinite looping\nCtrl+C to exit")
 
     path_index = 0 # Which point vehicle is at in the path
+    pindex = 0
+    flag = False
 
     while True:
         env.world.tick()
         env.world.wait_for_tick()
+        
 
         # Output camera display onto an OpenCV Window
         cv2.imshow("RGB Camera (press q to exit)", env.sensor_data['rgb_img'])
@@ -763,21 +766,26 @@ if __name__ == '__main__':
 
                 for point in oxl:
                     env.world.debug.draw_string(point, 'x', draw_shadow=False,
-                                         color=carla.Color(r=0, g=0, b=255), life_time=900,
-                                         persistent_lines=True)
-                
-                
-                ppath = env.park(startnode, goal, ox, oy)  
-                for point in ppath:
-                    env.vehicle.set_transform(point)
-                    time.sleep(0.01)
+                                        color=carla.Color(r=0, g=0, b=255), life_time=900,
+                                        persistent_lines=True)
                     
+                if not flag:
+                    ppath = env.park(startnode, goal, ox, oy)
+                    for node in ppath:
+                        env.vehicle.set_transform(node)
+                        time.sleep(0.01)
+                    flag = True
 
-                #testp = carla.Location(-39.2, -45.4)
-                # env.world.debug.draw_string(testp, 'X', draw_shadow=False,
-                #                        color=carla.Color(r=0, g=0, b=255), life_time=600,
-                #                        persistent_lines=True)
-              
+
+                   
+
+                
+                    
+        
+        
+       
+
+
     
 
 
