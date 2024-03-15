@@ -559,7 +559,8 @@ class CarlaEnv():
             cpath.append(carla.Location(x[i], y[i], 0))
             
         for i in range(len(cpath)):
-            rotation = carla.Rotation(0, yaw[i],0)
+            print(yaw[i])
+            rotation = carla.Rotation(0, math.degrees(yaw[i]),0)
             p = carla.Transform(cpath[i], rotation)
             ppath.append(p)
 
@@ -670,7 +671,7 @@ if __name__ == '__main__':
         port = 6000
     tm_port = 2001
 
-    n_walkers = 30 # pedestrians
+    n_walkers = 10 # pedestrians
     # n_vehicles = 10
     n_vehicles = 0
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
@@ -736,7 +737,7 @@ if __name__ == '__main__':
                 target = carla.Location(float(spot[0]), float(spot[1]), 0)
                 print("Target YAW:", spot[3])
                 startnode = [point.location.x, point.location.y, np.deg2rad(point.rotation.yaw)]
-                goal = [-29, -44, np.deg2rad(0)]  # Need to change to actual goal position
+                goal = [-29.5, -43.9, np.deg2rad(0)]  # Need to change to actual goal position
                 ox = [] # x position list of Obstacles [m]
                 oy = [] # y position list of Obstacles [m]
                 ox.append(-31.5)
@@ -773,7 +774,9 @@ if __name__ == '__main__':
                     ppath = env.park(startnode, goal, ox, oy)
                     for node in ppath:
                         env.vehicle.set_transform(node)
-                        time.sleep(0.01)
+                        time.sleep(0.05)
+                    # vc = carla.VehicleControl(throttle=0.0, steer=0.0, brake=0.0, hand_brake=True, reverse=False, manual_gear_shift=False, gear=0)
+                    # env.vehicle.apply_control(vc)
                     flag = True
 
 
