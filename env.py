@@ -10,6 +10,7 @@ import random
 import cv2
 from ultralytics import YOLO
 from ultralytics.utils.plotting import Annotator 
+import Hybrid_A_Star
 
 
 user = getpass.getuser() # computer user
@@ -87,7 +88,7 @@ class CarlaEnv():
         self.blueprint_library = self.world.get_blueprint_library()
         self.dest = None
         self.obstacle_detected = False
-
+        self.location_list = []
         self.traffic_manager = self.client.get_trafficmanager(tm_port)
 
         self.spawn(n_vehicles, n_walkers)
@@ -309,17 +310,37 @@ class CarlaEnv():
                  self.ckp[4].x+5,
                  self.ckp[6].x-5]
         
+
         col_y = np.arange(-45+self.width/2, -15-self.width/2, self.width)
+        """
+        while True:
+            rand_x = random.randint(0, len(row_x)-1)
+            rand_y = random.randint(0, len(col_y)-1)
+            if self.vacancy_matrix[rand_x][rand_y]  == 1:
+                continue
+            else:
+                self.target_spont = [rand_x, rand_y]
+                break
+        """
+        # for testing
+        self.target_spont = [0, 0]
         location_list = []
-        for x in row_x:
-            for y in col_y:
-                location_list.append(carla.Location(x, y, 0))
-        
-        for point in location_list:
-           self.world.debug.draw_string(point, 'O', draw_shadow=False,
+        for id_x in range(len(row_x)):
+            for id_y in range(len(col_y)):
+                location = carla.Location(row_x[id_x], col_y[id_y], 0)
+                if id_x == self.target_spont[0] and id_y == self.target_spont[1]:
+                    self.vacancy_matrix[id_x][id_y] = 0
+                    self.world.debug.draw_string(location, 'O', draw_shadow=False,
                                          color=carla.Color(r=0, g=255, b=0), life_time=600,
                                          persistent_lines=True)
-        
+                else:
+                    self.vacancy_matrix[id_x][id_y] = 1
+                    self.world.debug.draw_string(location, 'O', draw_shadow=False,
+                                            color=carla.Color(r=255, g=0, b=0), life_time=600,
+                                            persistent_lines=True)
+                location_list.append(location)
+
+        self.location_list = location_list
         
         
         
@@ -358,16 +379,18 @@ class CarlaEnv():
     
     def search(self, vl_x, vl_y):
         row_x = [self.ckp[0].x, self.ckp[2].x, 0, self.ckp[4].x, 0, self.ckp[6].x]
-        col_y = [y for y in range(-45, -15, self.width)]
-        x = np.argmin(np.asarray(row_x) - vl_x)
-        y = np.argmin(np.asarray(col_y) - vl_y)
+        #col_y = [y for y in range(-45, -15, self.width)]
+        col_y = np.arange(-45+self.width/2, -15-self.width/2, self.width)
+        x = np.argmin(np.abs(np.asarray(row_x) - vl_x))
+        y = np.argmin(np.abs(col_y - vl_y))
         if x == 1 or x == 3:
-            result = [[x, y, self.vacancy_matrix[x][y]],
-                      [x+1, y, self.vacancy_matrix[x+1][y]]]
+            result = [[x, y, self.vacancy_matrix[x][y], 0],
+                      [x+1, y, self.vacancy_matrix[x+1][y], 180]]
                 
         else:
-            result = [[x, y, self.vacancy_matrix[x][y]]]
-        
+            result = [[x, y, self.vacancy_matrix[x][y], 0],
+                      None]
+
         return result
     
     def init_sensors(self):
@@ -513,6 +536,34 @@ class CarlaEnv():
         self.actor_list.append(camera)
 
         print("Sensors initialized")
+
+    def park(self, start, goal, ox, oy):
+        
+        
+        path = Hybrid_A_Star.hybrid_a_star_planning(start, goal, ox, oy, Hybrid_A_Star.XY_GRID_RESOLUTION, Hybrid_A_Star.YAW_GRID_RESOLUTION)
+
+        x = path.x_list
+        y = path.y_list
+
+        cpath = []
+        
+        agent = BasicAgent(self.vehicle)
+        for i in range(x):
+            cpath[i] = carla.Location(x[i], y[i], 0)
+        
+        for dest in cpath:
+            Done = False
+            agent.set_destination(dest)
+            while not Done:
+                self.vehicle.apply_control(agent.run_step())
+                
+                v_loc = self.vehicle.get_location()
+                dist = euclidean_distance((v_loc.x, v_loc.y), (dest.x, dest.y))
+                
+                if dist<0.1:
+                    Done = True
+                    break
+
     """
     def drive(self):
         #TODO ZEQI
@@ -535,15 +586,8 @@ class CarlaEnv():
                     Done = True
                     break
     """
-    def drive(self, path):
-        for point in path:
-            try:
-                self.vehicle.set_transform(point)
-                time.sleep(0.001)
-            except Exception as collision:
-                print("Failed to move vehicle:", point.location)
-                continue
-
+    
+            
 
 def spectate(env):
     while(True):
@@ -576,9 +620,15 @@ def osm_to_xodr(osm_path):
     f.write(xodr_data)
     f.close()
     print(f"{xodr_path} created")
+
+
+
+
     
     
 if __name__ == '__main__':
+    random.seed(0)
+    np.random.seed(0)
     osm_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.osm"
     xodr_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.xodr"
     #osm_to_xodr(osm_path)
@@ -627,13 +677,40 @@ if __name__ == '__main__':
                 continue # skip this iteration if obstacle detected
 
             point = env.path[path_index]
-            try:
-                env.vehicle.set_transform(point)
-                path_index +=1
+            
+            
+            Done = False
+            if point.rotation.yaw != 0:
+                result = env.search(point.location.x, point.location.y)
+                for spot in result:
+                    if spot != None:
+                        
+                        if spot[2] == 0:
+                            print("Parking spot found")
+                            Done = True
+                            break
+                    
+            if not Done:
+                try:
+                    env.vehicle.set_transform(point)
+                    path_index +=1
 
-                # time.sleep(0.001)
-            except Exception as collision:
-                print("Failed to move vehicle:", point.location)
-                continue
+                    # time.sleep(0.001)
+                except Exception as collision:
+                    print("Failed to move vehicle:", point.location)
+                    continue
+            else:
+                start = point # transform
+                target = carla.Location(float(spot[0]), float(spot[1]), 0)
+                print("Target YAW:", spot[3])
+                startnode = [point.location.x, point.location.y, np.deg2rad(point.rotation.yaw)]
+                goal = [float(spot[0]), float(spot[1]), np.deg2rad(spot[3])]  # Need to change to actual goal position
+                ox = [] # x position list of Obstacles [m]
+                oy = [] # y position list of Obstacles [m]
+                ox.append(float(spot[0])-5)
+                oy.append(float(spot[1]))
+                env.park(startnode, goal, ox, oy)
+
+
 
     cv2.destroyAllWindows()

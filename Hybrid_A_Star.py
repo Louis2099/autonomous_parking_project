@@ -42,7 +42,7 @@ class Node:
 
     def __init__(self, x_ind, y_ind, yaw_ind, direction,
                  x_list, y_list, yaw_list, directions,
-                 steer=0.0, parent_index=None, cost=None):
+                 steer=0.0, parent_index=None, cost=0.0):
         self.x_index = x_ind
         self.y_index = y_ind
         self.yaw_index = yaw_ind
@@ -133,24 +133,24 @@ def calc_obstacle_map(ox, oy, resolution, vr):
 
 
 def calc_index(node, x_width, x_min, y_min):
-    return (node.y - y_min) * x_width + (node.x - x_min)
+    return (node.y_index - y_min) * x_width + (node.x_index - x_min)
 
 def verify_node(node, obstacle_map, min_x, min_y, max_x, max_y):
-    if node.x < min_x:
+    if node.x_index < min_x:
         return False
-    elif node.y < min_y:
+    elif node.y_index < min_y:
         return False
-    elif node.x >= max_x:
+    elif node.x_index >= max_x:
         return False
-    elif node.y >= max_y:
+    elif node.y_index >= max_y:
         return False
 
-    if obstacle_map[node.x][node.y]:
+    if obstacle_map[node.x_index][node.y_index]:
         return False
 
     return True
 
-def calc_distance_heuristic(gx, gy, ox, oy, resolution, rr):
+def calc_distance_heuristic(goalnode, ox, oy, resolution, rr):
     """
     gx: goal x position [m]
     gx: goal x position [m]
@@ -161,7 +161,7 @@ def calc_distance_heuristic(gx, gy, ox, oy, resolution, rr):
     """
 
     # Map the obstacle positions to the grid
-    goal_node = Node(round(gx / resolution), round(gy / resolution), 0.0, -1)
+    goal_node = goalnode
     ox = [iox / resolution for iox in ox]
     oy = [ioy / resolution for ioy in oy]
 
@@ -189,8 +189,8 @@ def calc_distance_heuristic(gx, gy, ox, oy, resolution, rr):
 
         # expand search grid based on motion model
         for i, _ in enumerate(motion):
-            node = Node(current.x + motion[i][0],
-                        current.y + motion[i][1],
+            node = Node(current.x_index + motion[i][0],
+                        current.y_index + motion[i][1],
                         current.cost + motion[i][2], c_id)
             n_id = calc_index(node, x_w, min_x, min_y)
 
@@ -271,7 +271,7 @@ def calc_next_node(current, steer, direction, config, ox, oy, kd_tree):
 
     node = Node(x_ind, y_ind, yaw_ind, d, x_list,
                 y_list, yaw_list, [d],
-                parent_index=calc_index(current, config),
+                parent_index=calc_index2(current, config),
                 cost=cost, steer=steer)
 
     return node
@@ -329,7 +329,7 @@ def update_node_with_analytic_expansion(current, goal,
         f_yaw = path.yaw[1:]
 
         f_cost = current.cost + calc_rs_path_cost(path)
-        f_parent_index = calc_index(current, c)
+        f_parent_index = calc_index2(current, c)
 
         fd = []
         for d in path.directions[1:]:
@@ -401,7 +401,7 @@ def hybrid_a_star_planning(start, goal, ox, oy, xy_resolution, yaw_resolution):
     start_node = Node(round(start[0] / xy_resolution),
                       round(start[1] / xy_resolution),
                       round(start[2] / yaw_resolution), True,
-                      [start[0]], [start[1]], [start[2]], [True], cost=0)
+                      [start[0]], [start[1]], [start[2]], [True], cost = 0)
     goal_node = Node(round(goal[0] / xy_resolution),
                      round(goal[1] / xy_resolution),
                      round(goal[2] / yaw_resolution), True,
@@ -415,14 +415,13 @@ def hybrid_a_star_planning(start, goal, ox, oy, xy_resolution, yaw_resolution):
     # Calculate all free space L2 distance to goal. (BFS)
     # Make it a heuristic lookup table.
     h_dp = calc_distance_heuristic(
-        goal_node.x_list[-1], goal_node.y_list[-1],
-        ox, oy, xy_resolution, BUBBLE_R)
+        goal_node, ox, oy, xy_resolution, BUBBLE_R)
 
     # pq is a heap queue that stores the cost and index of the node.
     pq = []
-    openList[calc_index(start_node, config)] = start_node
+    openList[calc_index2(start_node, config)] = start_node
     heapq.heappush(pq, (calc_cost(start_node, h_dp, config),
-                        calc_index(start_node, config)))
+                        calc_index2(start_node, config)))
     final_path = None
 
     # Just like the triditional A* search:
@@ -453,7 +452,7 @@ def hybrid_a_star_planning(start, goal, ox, oy, xy_resolution, yaw_resolution):
         # expand the node with vehicle kinamatics model.
         for neighbor in get_neighbors(current, config, ox, oy,
                                       obstacle_kd_tree):
-            neighbor_index = calc_index(neighbor, config)
+            neighbor_index = calc_index2(neighbor, config)
             if neighbor_index in closedList:
                 continue
             if neighbor not in openList \
@@ -514,7 +513,7 @@ def verify_index(node, c):
     return False
 
 
-def calc_index(node, c):
+def calc_index2(node, c):
     '''
     Map the node to a 1D array.
     '''
@@ -522,7 +521,7 @@ def calc_index(node, c):
           (node.y_index - c.min_y) * c.x_w + (node.x_index - c.min_x)
 
     if ind <= 0:
-        print("Error(calc_index):", ind)
+        print("Error(calc_index2):", ind)
 
     return ind
 
