@@ -16,26 +16,29 @@ Usage: call: path = hybrid_a_star_planning(start, goal, ox, oy, xy_resolution, y
 '''
 import heapq
 import math
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import cKDTree
 import sys
 import pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.parent))
 
+from A_star_search import calc_distance_heuristic
 import reeds_shepp as rs
 
 from Kinetic_Model import *
 
 XY_GRID_RESOLUTION = 0.5  # [m]
-YAW_GRID_RESOLUTION = np.deg2rad(5.0)  # [rad]
+YAW_GRID_RESOLUTION = np.deg2rad(2.0)  # [rad]
 MOTION_RESOLUTION = 0.08  # [m] path interpolate resolution
-N_STEER = 20             # number of steer command
+N_STEER = 40             # number of steer command
 
-SB_COST = 100.0          # switch back penalty cost
-BACK_COST = 50.0         # backward penalty cost
+SB_COST = 0.0          # switch back penalty cost
+BACK_COST = 0.0        # backward penalty cost
 STEER_CHANGE_COST = 2.0  # steer angle change penalty cost
 STEER_COST = 0.0         # steer angle not zero cost
-H_COST = 2.5             # Heuristic cost
+H_COST = 3             # Heuristic cost
+
 
 
 class Node:
@@ -93,127 +96,6 @@ class Config:
         self.min_yaw = round(- math.pi / yaw_resolution) - 1
         self.max_yaw = round(math.pi / yaw_resolution)
         self.yaw_w = round(self.max_yaw - self.min_yaw)
-
-def get_motion_model():
-    # dx, dy, cost
-    motion = [[1, 0, 1],
-              [0, 1, 1],
-              [-1, 0, 1],
-              [0, -1, 1],
-              [-1, -1, math.sqrt(2)],
-              [-1, 1, math.sqrt(2)],
-              [1, -1, math.sqrt(2)],
-              [1, 1, math.sqrt(2)]]
-
-    return motion
-
-def calc_obstacle_map(ox, oy, resolution, vr):
-    min_x = round(min(ox))
-    min_y = round(min(oy))
-    max_x = round(max(ox))
-    max_y = round(max(oy))
-
-    x_width = round(max_x - min_x)
-    y_width = round(max_y - min_y)
-
-    # obstacle map generation
-    obstacle_map = [[False for _ in range(y_width)] for _ in range(x_width)]
-    for ix in range(x_width):
-        x = ix + min_x
-        for iy in range(y_width):
-            y = iy + min_y
-            #  print(x, y)
-            for iox, ioy in zip(ox, oy):
-                d = math.sqrt((iox - x) ** 2 + (ioy - y) ** 2)
-                if d <= vr / resolution:
-                    obstacle_map[ix][iy] = True
-                    break
-
-    return obstacle_map, min_x, min_y, max_x, max_y, x_width, y_width
-
-
-def calc_index(node, x_width, x_min, y_min):
-    return (node.y - y_min) * x_width + (node.x - x_min)
-
-def verify_node(node, obstacle_map, min_x, min_y, max_x, max_y):
-    if node.x < min_x:
-        return False
-    elif node.y < min_y:
-        return False
-    elif node.x >= max_x:
-        return False
-    elif node.y >= max_y:
-        return False
-
-    if obstacle_map[node.x][node.y]:
-        return False
-
-    return True
-
-def calc_distance_heuristic(gx, gy, ox, oy, resolution, rr):
-    """
-    gx: goal x position [m]
-    gx: goal x position [m]
-    ox: x position list of Obstacles [m]
-    oy: y position list of Obstacles [m]
-    resolution: grid resolution [m]
-    rr: robot radius[m]
-    """
-
-    # Map the obstacle positions to the grid
-    goal_node = Node(round(gx / resolution), round(gy / resolution), 0.0, -1)
-    ox = [iox / resolution for iox in ox]
-    oy = [ioy / resolution for ioy in oy]
-
-    obstacle_map, min_x, min_y, max_x, max_y, x_w, y_w = calc_obstacle_map(
-        ox, oy, resolution, rr)
-
-    motion = get_motion_model()
-
-    open_set, closed_set = dict(), dict()
-    open_set[calc_index(goal_node, x_w, min_x, min_y)] = goal_node
-    priority_queue = [(0, calc_index(goal_node, x_w, min_x, min_y))]
-
-    while 1:
-        if not priority_queue:
-            break
-        cost, c_id = heapq.heappop(priority_queue)
-        if c_id in open_set:
-            current = open_set[c_id]
-            closed_set[c_id] = current
-            open_set.pop(c_id)
-        else:
-            continue
-
-        
-
-        # expand search grid based on motion model
-        for i, _ in enumerate(motion):
-            node = Node(current.x + motion[i][0],
-                        current.y + motion[i][1],
-                        current.cost + motion[i][2], c_id)
-            n_id = calc_index(node, x_w, min_x, min_y)
-
-            if n_id in closed_set:
-                continue
-
-            if not verify_node(node, obstacle_map, min_x, min_y, max_x, max_y):
-                continue
-
-            if n_id not in open_set:
-                open_set[n_id] = node  # Discover a new node
-                heapq.heappush(
-                    priority_queue,
-                    (node.cost, calc_index(node, x_w, min_x, min_y)))
-            else:
-                if open_set[n_id].cost >= node.cost:
-                    # This path is the best until now. record it!
-                    open_set[n_id] = node
-                    heapq.heappush(
-                        priority_queue,
-                        (node.cost, calc_index(node, x_w, min_x, min_y)))
-
-    return closed_set
 
 
 def calc_motion_inputs():
@@ -323,7 +205,8 @@ def update_node_with_analytic_expansion(current, goal,
     path = analytic_expansion(current, goal, ox, oy, kd_tree)
 
     if path:
-           
+        
+            
         f_x = path.x[1:]
         f_y = path.y[1:]
         f_yaw = path.yaw[1:]
@@ -441,6 +324,7 @@ def hybrid_a_star_planning(start, goal, ox, oy, xy_resolution, yaw_resolution):
         else:
             continue
 
+       
 
         is_updated, final_path = update_node_with_analytic_expansion(
             current, goal_node, config, ox, oy, obstacle_kd_tree)
@@ -499,7 +383,7 @@ def get_final_path(closed, goal_node):
     direction = list(reversed(direction))
 
     # adjust first direction
-    direction[0] = direction[1]
+    #direction[0] = direction[1]
 
     path = Path(reversed_x, reversed_y, reversed_yaw, direction, final_cost)
 
@@ -521,10 +405,8 @@ def calc_index(node, c):
     ind = (node.yaw_index - c.min_yaw) * c.x_w * c.y_w + \
           (node.y_index - c.min_y) * c.x_w + (node.x_index - c.min_x)
 
-    if ind <= 0:
-        print("Error(calc_index):", ind)
+    # if ind <= 0:
+    #     print("Error(calc_index):", ind)
 
     return ind
-
-
 
