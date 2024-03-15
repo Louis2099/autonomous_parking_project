@@ -773,8 +773,10 @@ if __name__ == '__main__':
                 if not flag:
                     ppath = env.park(startnode, goal, ox, oy)
                     for node in ppath:
-                        env.vehicle.set_transform(node)
                         time.sleep(0.05)
+                        env.vehicle.set_transform(node)
+                    # pp = carla.Location(-29.5, -43.9, 0)
+                    # env.vehicle.set_locationn(pp)
                     # vc = carla.VehicleControl(throttle=0.0, steer=0.0, brake=0.0, hand_brake=True, reverse=False, manual_gear_shift=False, gear=0)
                     # env.vehicle.apply_control(vc)
                     flag = True
