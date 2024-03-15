@@ -552,30 +552,44 @@ class CarlaEnv():
         yaw = path.yaw_list
 
         cpath = []
+        ppath = []
         #print(len(x), len(y))
         agent = BasicAgent(self.vehicle)
         for i in range(len(x)):
             cpath.append(carla.Location(x[i], y[i], 0))
+            
+        for i in range(len(cpath)):
+            rotation = carla.Rotation(0, yaw[i],0)
+            p = carla.Transform(cpath[i], rotation)
+            ppath.append(p)
 
-
-        for point in cpath:
-            self.world.debug.draw_string(point, 'O', draw_shadow=False,
-                                       color=carla.Color(r=0, g=0, b=255), life_time=900,
-                                       persistent_lines=True)
-        
         for dest in cpath:
-            Done = False
-            agent.set_destination(dest)
-            while not Done:
-                self.vehicle.apply_control(agent.run_step())
+            env.world.debug.draw_string(dest, 'o', draw_shadow=False,
+                                         color=carla.Color(r=0, g=0, b=255), life_time=900,
+                                         persistent_lines=True)
+
+        
+            
+        return ppath
+        
+        # for dest in cpath:
+        #     # Done = False
+        #     # agent.set_destination(dest)
+        #     # while not Done:
+        #     #     self.vehicle.apply_control(agent.run_step())
                 
-                v_loc = self.vehicle.get_location()
-                dist = euclidean_distance((v_loc.x, v_loc.y), (dest.x, dest.y))
+        #     #     v_loc = self.vehicle.get_location()
+        #     #     dist = euclidean_distance((v_loc.x, v_loc.y), (dest.x, dest.y))
                 
-                if dist<0.1:
-                    Done = True
-                    break
-            #env.vehicle.set_location(dest)
+        #     #     if dist<0.1:
+        #     #         Done = True
+        #     #         break
+        #     self.vehicle.set_location(dest)
+        #     time.sleep(0.001)
+
+
+
+        #     #env.vehicle.set_location(dest)
 
     """
     def drive(self):
@@ -752,12 +766,19 @@ if __name__ == '__main__':
                                          color=carla.Color(r=0, g=0, b=255), life_time=900,
                                          persistent_lines=True)
                 
+                
+                ppath = env.park(startnode, goal, ox, oy)  
+                for point in ppath:
+                    env.vehicle.set_transform(point)
+                    time.sleep(0.01)
+                    
+
                 #testp = carla.Location(-39.2, -45.4)
                 # env.world.debug.draw_string(testp, 'X', draw_shadow=False,
                 #                        color=carla.Color(r=0, g=0, b=255), life_time=600,
                 #                        persistent_lines=True)
-                env.park(startnode, goal, ox, oy)
-
+              
+    
 
 
     cv2.destroyAllWindows()
