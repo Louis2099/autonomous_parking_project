@@ -11,7 +11,7 @@ import cv2
 from ultralytics import YOLO
 from ultralytics.utils.plotting import Annotator 
 import Hybrid_A_Star
-
+from utils.path_planning import path_plan
 
 user = getpass.getuser() # computer user
 
@@ -32,13 +32,15 @@ sys.path.append(path_to_carla + "/PythonAPI/carla")
 # Import carla after setting the Python path
 import carla
 from agents.navigation.basic_agent import BasicAgent
+from agents.navigation.global_route_planner import GlobalRoutePlanner as planner
 
 
 
-def load_custom_map(xodr_path, client):
+def load_custom_map(xodr_path, fbx_path, client):
     """
     Load map from xodr file
     """
+    print("Load custom map: ", xodr_path)
     if os.path.exists(xodr_path):
         with open(xodr_path, encoding='utf-8') as od_file:
             try:
@@ -61,7 +63,15 @@ def load_custom_map(xodr_path, client):
                 enable_mesh_visibility=True))
     else:
         print(os.getcwd())
-        print('file not found.')
+        print('file not found. could not load custom map!')
+        exit()
+
+    # if os.path.exists(fbx_path):
+    #     print("Loading fbx file:", fbx_path)
+    #     with open(fbx_path, "rb") as f:
+    #         fbx_bp = carla.ActorBlueprint(f.read())
+    #         fbx_actor = world.spawn_actor(fbx_bp, carla.Transform())
+
     return world
 
 def euclidean_distance(point1, point2):
@@ -81,19 +91,23 @@ class CarlaEnv():
     def __init__(self, port, tm_port, default_map=None, n_vehicles=0, n_walkers = 0):
         self.client = carla.Client("localhost", port)
         self.client.set_timeout(10.0)
-        self.world = self.client.load_world(default_map)
-        #self.world = load_custom_map(xodr_path, self.client)
-        self.path_planning()
+        # self.world = self.client.load_world(default_map)
+        xodr_path = r"D:\autonomous_parking_project\maps\parkinglot_2.xodr"
+        fbx_path = r"D:\autonomous_parking_project\maps\parkinglot.fbx"
+        self.world = load_custom_map(xodr_path, fbx_path, self.client)
+
+        # self.path_planning()
         self.actor_list = []
         self.blueprint_library = self.world.get_blueprint_library()
         self.dest = None
-        self.obstacle_detected = False
-        self.location_list = []
-        self.traffic_manager = self.client.get_trafficmanager(tm_port)
+        # self.obstacle_detected = False
+        # self.location_list = []
+        # self.traffic_manager = self.client.get_trafficmanager(tm_port)
 
-        self.spawn(n_vehicles, n_walkers)
-        self.set_world_settings()
-        self.init_sensors()
+        #self.spawn(n_vehicles, n_walkers)
+        # self.set_world_settings()
+        # self.init_sensors()
+
         
     def _get_spawn_point(self):
         # Parking lot dimensions
@@ -104,13 +118,14 @@ class CarlaEnv():
         # Generate spawn point
         spawn_point = carla.Transform()
         # Get the start point
-        start_transform = self.get_start_point()
-        start_location = start_transform.location
+        # start_transform = self.get_start_point()
+        # start_location = start_transform.location
 
         # Generate a random location within the parking lot
         loc = carla.Location(x=np.random.uniform(min_x, max_x),
                             y=np.random.uniform(min_y, max_y),
-                            z=start_location.z)
+                            # z=start_location.z)
+                            z=0.5)
         spawn_point.location = loc
         # Set rotation to be north to south
         spawn_point.rotation.yaw = 0
@@ -125,9 +140,7 @@ class CarlaEnv():
         # --------------
         ego_vehicle_bp = self.blueprint_library.filter('model3')[0]
         ego_vehicle_bp.set_attribute('role_name', 'hero')
-        spawn_point = self.get_start_point()
-        # testing
-        spawn_point = self.path[0]
+        spawn_point = self.world.get_map().get_spawn_points()[0]
         
         while True:
             try:
@@ -289,6 +302,11 @@ class CarlaEnv():
             start_transform =carla.Transform(carla.Location(start_point.transform.location.x, 
                                                             start_point.transform.location.y, 0.5), 
                                              start_point.transform.rotation)
+        else:
+            start_point = self.world.get_map().get_spawn_points()[0]
+            start_transform =carla.Transform(carla.Location(start_point.transform.location.x, 
+                                                start_point.transform.location.y, 0.5), 
+                                    start_point.transform.rotation)
         return start_transform
         #return spawn_point
     
@@ -645,72 +663,74 @@ if __name__ == '__main__':
     # n_vehicles = 10
     n_vehicles = 0
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
+    path_plan(env.world, planner)
 
-    #spectate(env)
+
+    # #spectate(env)
     
     
     
-    env.mark_parking_spots()
-    # env.drive(env.path)
-    #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
-    #env.drive()
+    # env.mark_parking_spots()
+    # # env.drive(env.path)
+    # #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
+    # #env.drive()
     
-    print("Started simulation. Infinite looping\nCtrl+C to exit")
+    # print("Started simulation. Infinite looping\nCtrl+C to exit")
 
-    path_index = 0 # Which point vehicle is at in the path
+    # path_index = 0 # Which point vehicle is at in the path
 
-    while True:
-        env.world.tick()
-        env.world.wait_for_tick()
+    # while True:
+    #     env.world.tick()
+    #     env.world.wait_for_tick()
 
-        # Output camera display onto an OpenCV Window
-        cv2.imshow("RGB Camera (press q to exit)", env.sensor_data['rgb_img'])
-        cv2.imshow("Depth Camera (press q to exit)", env.sensor_data['depth_img'])
-        # Exit with q or ctrl+c
-        if cv2.waitKey(1) == ord('q'):
-            break
+    #     # Output camera display onto an OpenCV Window
+    #     cv2.imshow("RGB Camera (press q to exit)", env.sensor_data['rgb_img'])
+    #     cv2.imshow("Depth Camera (press q to exit)", env.sensor_data['depth_img'])
+    #     # Exit with q or ctrl+c
+    #     if cv2.waitKey(1) == ord('q'):
+    #         break
 
-        # Drive the vehicle along the path
-        if path_index < len(env.path):
-            if env.obstacle_detected:
-                print("Obstacle detected")
-                continue # skip this iteration if obstacle detected
+    #     # Drive the vehicle along the path
+    #     if path_index < len(env.path):
+    #         if env.obstacle_detected:
+    #             print("Obstacle detected")
+    #             continue # skip this iteration if obstacle detected
 
-            point = env.path[path_index]
+    #         point = env.path[path_index]
             
             
-            Done = False
-            if point.rotation.yaw != 0:
-                result = env.search(point.location.x, point.location.y)
-                for spot in result:
-                    if spot != None:
+    #         Done = False
+    #         if point.rotation.yaw != 0:
+    #             result = env.search(point.location.x, point.location.y)
+    #             for spot in result:
+    #                 if spot != None:
                         
-                        if spot[2] == 0:
-                            print("Parking spot found")
-                            Done = True
-                            break
+    #                     if spot[2] == 0:
+    #                         print("Parking spot found")
+    #                         Done = True
+    #                         break
                     
-            if not Done:
-                try:
-                    env.vehicle.set_transform(point)
-                    path_index +=1
+    #         if not Done:
+    #             try:
+    #                 env.vehicle.set_transform(point)
+    #                 path_index +=1
 
-                    # time.sleep(0.001)
-                except Exception as collision:
-                    print("Failed to move vehicle:", point.location)
-                    continue
-            else:
-                start = point # transform
-                target = carla.Location(float(spot[0]), float(spot[1]), 0)
-                print("Target YAW:", spot[3])
-                startnode = [point.location.x, point.location.y, np.deg2rad(point.rotation.yaw)]
-                goal = [float(spot[0]), float(spot[1]), np.deg2rad(spot[3])]  # Need to change to actual goal position
-                ox = [] # x position list of Obstacles [m]
-                oy = [] # y position list of Obstacles [m]
-                ox.append(float(spot[0])-5)
-                oy.append(float(spot[1]))
-                env.park(startnode, goal, ox, oy)
+    #                 # time.sleep(0.001)
+    #             except Exception as collision:
+    #                 print("Failed to move vehicle:", point.location)
+    #                 continue
+    #         else:
+    #             start = point # transform
+    #             target = carla.Location(float(spot[0]), float(spot[1]), 0)
+    #             print("Target YAW:", spot[3])
+    #             startnode = [point.location.x, point.location.y, np.deg2rad(point.rotation.yaw)]
+    #             goal = [float(spot[0]), float(spot[1]), np.deg2rad(spot[3])]  # Need to change to actual goal position
+    #             ox = [] # x position list of Obstacles [m]
+    #             oy = [] # y position list of Obstacles [m]
+    #             ox.append(float(spot[0])-5)
+    #             oy.append(float(spot[1]))
+    #             env.park(startnode, goal, ox, oy)
 
 
 
-    cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
