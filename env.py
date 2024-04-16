@@ -61,6 +61,94 @@ def load_custom_map(xodr_path, fbx_path, client):
                 additional_width=extra_width,
                 smooth_junctions=True,
                 enable_mesh_visibility=True))
+        
+
+        # Spawn parking lot
+        import xml.etree.ElementTree as ET
+        from pyproj import Proj, transform as pyproj_transform
+
+        # Parse the XODR file
+        tree = ET.parse(xodr_path)
+        root = tree.getroot()
+
+        # Extract geographic reference information
+        header = root.find('header')
+        geo_ref = "+proj=tmerc +lat_0=30.161615 +lon_0=-85.59196 +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +vunits=m +no_defs" # header.find('geoReference').text
+
+        # Extract boundary coordinates for the coordinate transformation
+        north = float(header.attrib['north'])
+        south = float(header.attrib['south'])
+        east = float(header.attrib['east'])
+        west = float(header.attrib['west'])
+
+        # Define the projection function for the transformation
+        in_proj = Proj(geo_ref)  # Use the geographic reference information from the XODR header
+        out_proj = Proj(init='epsg:4326')  # WGS84 coordinate system
+
+        # Define a function to convert local coordinates (s, t) to global coordinates (x, y)
+        def local_to_global(s, t):
+            x, y = pyproj_transform(in_proj, out_proj, s, t)
+            return x, y
+
+        # Find all object elements representing parking spaces
+        parking_spaces = root.findall(".//object[@type='parkingSpace']")
+
+        # Extract information for each parking space
+        parking_bp = world.get_blueprint_library().find('vehicle.tesla.model3')  # Example blueprint
+        for parking_space in parking_spaces:
+            id = parking_space.attrib['id']
+            s = float(parking_space.attrib['s'])
+            t = float(parking_space.attrib['t'])
+            hdg = float(parking_space.attrib['hdg'])
+            zOffset = float(parking_space.attrib['zOffset'])
+            width = float(parking_space.attrib['width'])
+            length = float(parking_space.attrib['length'])
+            orientation = parking_space.attrib['orientation']
+
+            x, y = local_to_global(s, t)
+            # print("x, y:", x, y)
+            transform = carla.Transform(carla.Location(north+float(s), east+float(t), 5))  # Adjust the z coordinate as needed
+            world.try_spawn_actor(parking_bp, transform)
+
+
+            
+        labels = ["None",
+        "Buildings",
+        "Fences",
+        "Other",
+        "Pedestrians",
+        "Poles",
+        "RoadLines",
+        "Roads",
+        "Sidewalks",
+        "TrafficSigns",
+        "Vegetation",
+        "Car",
+        "Bus",
+        "Truck",
+        "Motorcycle",
+        "Bicycle",
+        "Rider",
+        "Train",
+        "Walls",
+        "Sky",
+        "Ground",
+        "Bridge",
+        "RailTrack",
+        "GuardRail",
+        "TrafficLight",
+        "Static",
+        "Dynamic",
+        "Water",
+        "Terrain",
+        "Any",]
+        for l in labels:
+            try:
+                print(l, world.get_environment_objects(getattr(carla.CityObjectLabel, l)))
+            except Exception as e:
+                print(f"Failed on {l}: {e}")
+
+        print("Objects:", world.get_actors())
     else:
         print(os.getcwd())
         print('file not found. could not load custom map!')
@@ -92,8 +180,9 @@ class CarlaEnv():
         self.client = carla.Client("localhost", port)
         self.client.set_timeout(10.0)
         # self.world = self.client.load_world(default_map)
-        xodr_path = r"D:\autonomous_parking_project\maps\parkinglot_2.xodr"
-        fbx_path = r"D:\autonomous_parking_project\maps\parkinglot.fbx"
+        xodr_path = r"D:\autonomous_parking_project\maps\xparkinglot_17.xodr"
+        fbx_path = None # r"D:\autonomous_parking_project\maps\parkinglot.fbx"
+        geojson_path = r"D:\autonomous_parking_project\maps\xparkinglot.geojson"
         self.world = load_custom_map(xodr_path, fbx_path, self.client)
 
         # self.path_planning()
