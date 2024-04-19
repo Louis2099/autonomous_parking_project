@@ -51,7 +51,7 @@ def load_custom_map(xodr_path, fbx_path, client):
         print('load opendrive map %r.' % os.path.basename(xodr_path))
         vertex_distance = 2.0  # in meters
         max_road_length = 500.0 # in meters
-        wall_height = 1.0      # in meters
+        wall_height = 0      # in meters
         extra_width = 0.6      # in meters
         world = client.generate_opendrive_world(
             data, carla.OpendriveGenerationParameters(
@@ -110,45 +110,6 @@ def load_custom_map(xodr_path, fbx_path, client):
             transform = carla.Transform(carla.Location(north+float(s), east+float(t), 5))  # Adjust the z coordinate as needed
             world.try_spawn_actor(parking_bp, transform)
 
-
-            
-        labels = ["None",
-        "Buildings",
-        "Fences",
-        "Other",
-        "Pedestrians",
-        "Poles",
-        "RoadLines",
-        "Roads",
-        "Sidewalks",
-        "TrafficSigns",
-        "Vegetation",
-        "Car",
-        "Bus",
-        "Truck",
-        "Motorcycle",
-        "Bicycle",
-        "Rider",
-        "Train",
-        "Walls",
-        "Sky",
-        "Ground",
-        "Bridge",
-        "RailTrack",
-        "GuardRail",
-        "TrafficLight",
-        "Static",
-        "Dynamic",
-        "Water",
-        "Terrain",
-        "Any",]
-        for l in labels:
-            try:
-                print(l, world.get_environment_objects(getattr(carla.CityObjectLabel, l)))
-            except Exception as e:
-                print(f"Failed on {l}: {e}")
-
-        print("Objects:", world.get_actors())
     else:
         print(os.getcwd())
         print('file not found. could not load custom map!')
@@ -179,11 +140,13 @@ class CarlaEnv():
     def __init__(self, port, tm_port, default_map=None, n_vehicles=0, n_walkers = 0):
         self.client = carla.Client("localhost", port)
         self.client.set_timeout(10.0)
-        # self.world = self.client.load_world(default_map)
-        xodr_path = r"D:\autonomous_parking_project\maps\xparkinglot_17.xodr"
-        fbx_path = None # r"D:\autonomous_parking_project\maps\parkinglot.fbx"
-        geojson_path = r"D:\autonomous_parking_project\maps\xparkinglot.geojson"
-        self.world = load_custom_map(xodr_path, fbx_path, self.client)
+        print(self.client.get_available_maps())
+
+        self.world = self.client.load_world(default_map)
+        # xodr_path = r"D:\autonomous_parking_project\maps\parkinglot03.xodr"
+        # fbx_path = None # r"D:\autonomous_parking_project\maps\parkinglot.fbx"
+        # geojson_path = r"D:\autonomous_parking_project\maps\xparkinglot.geojson"
+        # self.world = load_custom_map(xodr_path, fbx_path, self.client)
 
         # self.path_planning()
         self.actor_list = []
@@ -740,7 +703,7 @@ if __name__ == '__main__':
     xodr_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.xodr"
     #osm_to_xodr(osm_path)
     #['Town04','Town05']
-    default_map = 'Town05'
+    default_map = 'parkinglot01'
 
     if user == "wqiu2":
         port = 2000
