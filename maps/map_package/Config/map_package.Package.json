@@ -1,0 +1,10 @@
+{
+    "props": [],
+    "maps": [
+        {
+            "name": "parkinglot01",
+            "path": "/Game/map_package/Maps/parkinglot01",
+            "use_carla_materials": true
+        }
+    ]
+}
