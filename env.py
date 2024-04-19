@@ -212,6 +212,7 @@ class CarlaEnv():
         ego_vehicle_bp = self.blueprint_library.filter('model3')[0]
         ego_vehicle_bp.set_attribute('role_name', 'hero')
         spawn_point = self.spawn_points[0]
+        spawn_point.location.z = 0.1 # Lower it to prevent spawn, bounce, and flipping over!
         
         while True:
             try:
@@ -611,7 +612,7 @@ class CarlaEnv():
                 else:
                     color = (0, 100, 0) # green
 
-                annotator.box_label(box, str(int(depth))+"cm", color=color)
+                annotator.box_label(box, str(int(depth)), color=color)
 
             self.obstacle_detected = obj_detected
             
@@ -840,10 +841,11 @@ if __name__ == '__main__':
                 try:
                     env.vehicle.set_transform(point)
                     path_index +=1
+                       
 
                     # time.sleep(0.001)
-                except Exception as collision:
-                    print("Failed to move vehicle:", point.location)
+                except Exception as e:
+                    print("Failed to move vehicle:", e)
                     continue
             else:
                 start = point # transform
