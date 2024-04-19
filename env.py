@@ -15,8 +15,12 @@ from ultralytics.utils.plotting import Annotator
 user = getpass.getuser() # computer user
 
 # Set the path to the carla folder
+"""
 if user == "wqiu2":
     path_to_carla = "D:\\carla"
+if user == "jiaze":
+    # path_to_carla = "H:\\carla\WindowsNoEditor"
+    path_to_carla = "H:\CARLA\carla"
 else:
     path_to_carla = os.path.expanduser("~/carla/carla_0_9_15")
 print("path_to_carla:", path_to_carla)
@@ -28,9 +32,19 @@ sys.path.append(glob.glob(path_to_carla + '/PythonAPI/carla/dist/carla-*%d.%d-%s
     'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
 sys.path.append(path_to_carla + "/PythonAPI/carla")
 
+try: 
+    # Add the carla library to the Python path
+    sys.path.append(glob.glob(path_to_carla + '/PythonAPI/carla/dist/carla-*%d.%d-%s.egg' % (
+        sys.version_info.major,
+        sys.version_info.minor,
+        'win-amd64' if os.name == 'nt' else 'linux-x86_64'))[0])
+    sys.path.append(path_to_carla + "/PythonAPI/carla")
+except IndexError:
+    pass
+"""
 # Import carla after setting the Python path
 import carla
-from agents.navigation.basic_agent import BasicAgent
+#from agents.navigation.basic_agent import BasicAgent
 
 
 
@@ -483,6 +497,79 @@ class CarlaEnv():
         self.actor_list.append(camera)
 
         print("Sensors initialized")
+
+    def park(self, start, goal, ox, oy):
+        
+        
+        path = Hybrid_A_Star.hybrid_a_star_planning(start, goal, ox, oy, Hybrid_A_Star.XY_GRID_RESOLUTION, Hybrid_A_Star.YAW_GRID_RESOLUTION)
+
+        x = path.x_list
+        y = path.y_list
+        yaw = path.yaw_list
+
+        cpath = []
+        ppath = []
+        #print(len(x), len(y))
+        #agent = BasicAgent(self.vehicle)
+        for i in range(len(x)):
+            cpath.append(carla.Location(x[i], y[i], 0))
+            
+        for i in range(len(cpath)):
+            print(yaw[i])
+            rotation = carla.Rotation(0, math.degrees(yaw[i]),0)
+            p = carla.Transform(cpath[i], rotation)
+            ppath.append(p)
+
+        for dest in cpath:
+            env.world.debug.draw_string(dest, 'o', draw_shadow=False,
+                                         color=carla.Color(r=0, g=0, b=255), life_time=900,
+                                         persistent_lines=True)
+
+        
+            
+        return ppath
+        
+        # for dest in cpath:
+        #     # Done = False
+        #     # agent.set_destination(dest)
+        #     # while not Done:
+        #     #     self.vehicle.apply_control(agent.run_step())
+                
+        #     #     v_loc = self.vehicle.get_location()
+        #     #     dist = euclidean_distance((v_loc.x, v_loc.y), (dest.x, dest.y))
+                
+        #     #     if dist<0.1:
+        #     #         Done = True
+        #     #         break
+        #     self.vehicle.set_location(dest)
+        #     time.sleep(0.001)
+
+
+
+        #     #env.vehicle.set_location(dest)
+
+    """
+    def drive(self):
+        #TODO ZEQI
+        self.path_planning()
+        actor = self.vehicle
+        actor_agent = BasicAgent(actor)
+        
+        for dest in self.path:
+            Done = False
+            actor_agent.set_destination(dest)
+            while not Done:
+                actor.apply_control(actor_agent.run_step())
+                self.world.wait_for_tick()
+                v_loc = actor.get_location()
+                dist = euclidean_distance((v_loc.x, v_loc.y), (dest.x, dest.y))
+                print(f"DIST {dist}")
+                print(f"v_loc {v_loc}")
+                print(f"dest {dest}")
+                if dist<0.1:
+                    Done = True
+                    break
+    """
     
 
 def spectate(env):
@@ -519,6 +606,9 @@ def osm_to_xodr(osm_path):
     
     
 if __name__ == '__main__':
+
+    random.seed(0)
+    np.random.seed(0)
     osm_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.osm"
     xodr_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.xodr"
     #osm_to_xodr(osm_path)
@@ -529,9 +619,13 @@ if __name__ == '__main__':
         port = 2000
     else:
         port = 6000
-    tm_port = 2001
     n_walkers = 50 # pedestrians
     n_vehicles = 50
+    tm_port = 2000
+
+    n_walkers = 10 # pedestrians
+    # n_vehicles = 10
+    n_vehicles = 0
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
 
     #spectate(env)
