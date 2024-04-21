@@ -16,10 +16,11 @@ from utils.path_planning import path_plan
 user = getpass.getuser() # computer user
 
 # Set the path to the carla folder
-"""
+
+print("User:", user)
 if user == "wqiu2":
     path_to_carla = "D:\\carla"
-if user == "jiaze":
+elif user == "jiaze":
     # path_to_carla = "H:\\carla\WindowsNoEditor"
     path_to_carla = "H:\CARLA\carla"
 else:
@@ -42,7 +43,7 @@ try:
     sys.path.append(path_to_carla + "/PythonAPI/carla")
 except IndexError:
     pass
-"""
+
 # Import carla after setting the Python path
 import carla
 #from agents.navigation.basic_agent import BasicAgent
@@ -439,7 +440,7 @@ class CarlaEnv():
         
         
     def path_planning(self):
-        """
+        
         self.ckp = [carla.Location(-38, -30, 0), 
                      carla.Location(-38, -47, 0),
                      carla.Location(-19, -47, 0),
@@ -449,9 +450,10 @@ class CarlaEnv():
                      carla.Location(16, -47, 0),
                      carla.Location(16, -28, 0)
                      ]
-        """
-        self.ckp = path_plan(self.world, planner) # series of waypoints
-        self.ckp = [wp[0].transform.location for wp in self.ckp]
+        
+        #self.ckp = path_plan(self.world, planner) # series of waypoints
+        #self.ckp = [wp[0].transform.location for wp in self.ckp]
+        
         self.path = []
         step_size = 0.1
         for ckp in self.ckp[:-1]:
@@ -774,7 +776,7 @@ if __name__ == '__main__':
     xodr_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.xodr"
     #osm_to_xodr(osm_path)
     #['Town04','Town05']
-    default_map = 'parkinglot01'
+    default_map = 'Town05'
 
     if user == "wqiu2":
         port = 2000
@@ -794,7 +796,7 @@ if __name__ == '__main__':
     
     
     
-    # env.mark_parking_spots()
+    env.mark_parking_spots()
     # env.drive(env.path)
     #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
     #env.drive()
@@ -826,7 +828,7 @@ if __name__ == '__main__':
             Done = False
 
             # search for parking spot
-            """
+            
             if point.rotation.yaw != 0:
                 result = env.search(point.location.x, point.location.y)
                 for spot in result:
@@ -836,7 +838,7 @@ if __name__ == '__main__':
                             print("Parking spot found")
                             Done = True
                             break
-            """     
+            
             if not Done:
                 try:
                     env.vehicle.set_transform(point)
