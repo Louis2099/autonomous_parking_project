@@ -7,11 +7,11 @@ from scipy.spatial.transform import Rotation as Rot
 Modify these vehicle parameters before use
 '''
 
-WB = 3.0  # wheel base length
-W = 2.0  # width of car
-LF = 3.3  # distance from rear to vehicle front end
-LB = 1.0  # distance from rear to vehicle back end
-MAX_STEER = pi/5  # [rad] maximum steering angle
+WB = 2.875  # wheel base length
+W = 1.85  # width of car
+LF = 3.7975  # distance from rear to vehicle front end
+LB = 0.9225  # distance from rear to vehicle back end
+MAX_STEER = pi/3  # [rad] maximum steering angle
 
 BUBBLE_DIST = (LF - LB) / 2.0  # distance from rear to center of vehicle.
 BUBBLE_R = np.hypot((LF + LB) / 2.0, W / 2.0)  # bubble radius

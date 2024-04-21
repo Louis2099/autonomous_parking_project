@@ -654,7 +654,7 @@ class CarlaEnv():
             cpath.append(carla.Location(x[i], y[i], 0))
             
         for i in range(len(cpath)):
-            print(yaw[i])
+            #print(yaw[i])
             rotation = carla.Rotation(0, math.degrees(yaw[i]),0)
             p = carla.Transform(cpath[i], rotation)
             ppath.append(p)
@@ -804,6 +804,7 @@ if __name__ == '__main__':
     print("Started simulation. Infinite looping\nCtrl+C to exit")
 
     path_index = 0 # Which point vehicle is at in the path
+    flag = False
 
     while True:
         env.world.tick()
@@ -859,7 +860,15 @@ if __name__ == '__main__':
                 oy = [] # y position list of Obstacles [m]
                 ox.append(float(spot[0])-5)
                 oy.append(float(spot[1]))
-                env.park(startnode, goal, ox, oy)
+
+                if not flag:
+                    parking_path = env.park(startnode, goal, ox, oy)
+
+                    for node in parking_path:
+                        time.sleep(0.05)
+                        env.vehicle.set_transform(node)
+                    flag = True
+                        
 
 
 
