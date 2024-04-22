@@ -474,7 +474,8 @@ class CarlaEnv():
             self.ckp_wp = path_plan(self.world, planner) # series of waypoints
             self.ckp = [wp[0].transform.location for wp in self.ckp_wp]
             self.path = []
-            rd_id = [ckp.road_id for ckp in self.ckp]
+            rd_id = [ckp.road_id for ckp 
+                     in self.ckp_wp]
             u_rd_id = []
             for id in rd_id:
                 if id not in u_rd_id:

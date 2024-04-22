@@ -37,7 +37,8 @@ def path_plan(world, planner):
     return a list with waypoints that can be connected into the path.
     """
     #path_ids = [13, 45, 8, 40, 6, 32, 56]
-    path_ids = [35, 6, 30]
+    #path_ids = [35, 6, 30]
+    path_ids = [16, 49, 6]
     wdmap = world.get_map()
     topology = wdmap.get_topology()
     resolution = 3
