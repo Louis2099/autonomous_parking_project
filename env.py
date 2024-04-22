@@ -177,7 +177,7 @@ class CarlaEnv():
         self.spawn(n_vehicles, n_walkers)
         self.set_world_settings()
         self.init_sensors()
-        self.path_planning()
+        self.path_planning(custom_map=True)
 
 
         
@@ -858,7 +858,7 @@ if __name__ == '__main__':
             #                 break
 
             # example search in custom map
-            dest = example_search(dest = carla.Location(x=-28.40, y=-12.20, z=0), cur_loc = point.location)
+            dest = example_search(dest = carla.Location(x=-29.90, y=-12.20, z=0), cur_loc = point.location)
 
             if dest != None:
                 Done = True
