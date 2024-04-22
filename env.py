@@ -485,6 +485,7 @@ class CarlaEnv():
             u_ckp_wp = [self.ckp_wp[id] for id in idx]
             for wp in u_ckp_wp:
                 self.path.append(wp.next_until_lane_end(0.1))
+            self.path = [wp.transform.location for wp in self.path]
         self.draw_path()
     
     
