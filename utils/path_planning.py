@@ -80,7 +80,7 @@ def path_plan(world, planner):
     """
 
 def eu_dist(p1, p2):
-    dist = math.sqrt((p1.x - p2.x)^2 + (p1.y - p2.y)^2)
+    dist = math.sqrt(math.pow((p1.x - p2.x), 2) + math.pow((p1.y - p2.y),2))
     return dist
         
 
