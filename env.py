@@ -338,7 +338,7 @@ class CarlaEnv():
         # Set starting location of the spectator camera
         spectator = self.world.get_spectator()
         transform = self.vehicle.get_transform()
-        spectator.set_transform(carla.Transform(transform.location + carla.Location(x=20,y=30, z=50),
+        spectator.set_transform(carla.Transform(transform.location + carla.Location(x=0,y=0, z=50),
         carla.Rotation(pitch=-90)))
 
         # Set weather of the world
@@ -407,6 +407,8 @@ class CarlaEnv():
         
 
         col_y = np.arange(-45+self.width/2, -15-self.width/2, self.width)
+        self.row_x = row_x
+        self.col_y = col_y
         """
         while True:
             rand_x = random.randint(0, len(row_x)-1)
@@ -418,7 +420,7 @@ class CarlaEnv():
                 break
         """
         # for testing
-        self.target_spont = [0, 0]
+        self.target_spont = [1, 0]
         location_list = []
         for id_x in range(len(row_x)):
             for id_y in range(len(col_y)):
@@ -478,17 +480,19 @@ class CarlaEnv():
 
     
     def search(self, vl_x, vl_y):
-        row_x = [self.ckp[0].x, self.ckp[2].x, 0, self.ckp[4].x, 0, self.ckp[6].x]
+        #row_x = [self.ckp[0].x, self.ckp[2].x, 0, self.ckp[4].x, 0, self.ckp[6].x]
         #col_y = [y for y in range(-45, -15, self.width)]
-        col_y = np.arange(-45+self.width/2, -15-self.width/2, self.width)
+        #col_y = np.arange(-45+self.width/2, -15-self.width/2, self.width)
+        row_x = self.row_x
+        col_y = self.col_y
         x = np.argmin(np.abs(np.asarray(row_x) - vl_x))
         y = np.argmin(np.abs(col_y - vl_y))
         if x == 1 or x == 3:
-            result = [[x, y, self.vacancy_matrix[x][y], 0],
-                      [x+1, y, self.vacancy_matrix[x+1][y], 180]]
+            result = [[row_x[x], col_y[y], self.vacancy_matrix[x][y], 0],
+                      [row_x[x+1], col_y[y], self.vacancy_matrix[x+1][y], 180]]
                 
         else:
-            result = [[x, y, self.vacancy_matrix[x][y], 0],
+            result = [[row_x[x], col_y[y], self.vacancy_matrix[x][y], 0],
                       None]
 
         return result
@@ -834,9 +838,9 @@ if __name__ == '__main__':
                 result = env.search(point.location.x, point.location.y)
                 for spot in result:
                     if spot != None:
-                        
                         if spot[2] == 0:
                             print("Parking spot found")
+                            print(result)
                             Done = True
                             break
             
@@ -852,7 +856,7 @@ if __name__ == '__main__':
                     continue
             else:
                 start = point # transform
-                target = carla.Location(float(spot[0]), float(spot[1]), 0)
+                target = carla.Location(float(spot[0]), float(spot[1]), 0.05)
                 print("Target YAW:", spot[3])
                 startnode = [point.location.x, point.location.y, np.deg2rad(point.rotation.yaw)]
                 goal = [float(spot[0]), float(spot[1]), np.deg2rad(spot[3])]  # Need to change to actual goal position
