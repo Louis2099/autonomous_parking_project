@@ -441,7 +441,7 @@ class CarlaEnv():
         
         
         
-    def path_planning(self, custom_map=False):
+    def path_planning(self, custom_map=True):
         if custom_map != True:
             self.ckp = [carla.Location(-38, -30, 0), 
                         carla.Location(-38, -47, 0),
@@ -471,11 +471,13 @@ class CarlaEnv():
                         for i in range(int(abs(delta_y)/step_size)):
                             self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y - i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
         else:
+            #show_road_id(self.world, self.world.get_map().get_topology())
+            #print_lane(10, self.world.get_map().get_topology(), self.world)
+            #print_lane(8, self.world.get_map().get_topology(), self.world)
             self.ckp_wp = path_plan(self.world, planner) # series of waypoints
-            self.ckp = [wp[0].transform.location for wp in self.ckp_wp]
+            self.ckp = [wp.transform.location for wp in self.ckp_wp]
             self.path = []
-            rd_id = [ckp.road_id for ckp 
-                     in self.ckp_wp]
+            rd_id = [ckp.road_id for ckp in self.ckp_wp]
             u_rd_id = []
             for id in rd_id:
                 if id not in u_rd_id:
@@ -485,8 +487,8 @@ class CarlaEnv():
                 idx.append(rd_id.index(id))
             u_ckp_wp = [self.ckp_wp[id] for id in idx]
             for wp in u_ckp_wp:
-                self.path.append(wp.next_until_lane_end(0.1))
-            self.path = [wp.transform.location for wp in self.path]
+                self.path += wp.next_until_lane_end(0.1)
+            self.path = [wp.transform for wp in self.path]
         self.draw_path()
     
     
@@ -793,8 +795,9 @@ if __name__ == '__main__':
     xodr_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.xodr"
     #osm_to_xodr(osm_path)
     #['Town04','Town05']
-    default_map = 'Town05'
-
+    #default_map = 'Town05'
+    default_map = 'parkinglotGG_bake'
+    
     if user == "wqiu2":
         port = 2000
     else:
@@ -806,9 +809,7 @@ if __name__ == '__main__':
 
     # n_vehicles = 10
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
-    #path = path_plan(env.world, planner) # series of waypoints
-
-
+    
     #spectate(env)
     
     

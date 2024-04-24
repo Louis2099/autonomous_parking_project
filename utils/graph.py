@@ -90,7 +90,7 @@ def optimize_path(G, start, exit):
     visualize_graph_and_path(G, e_path)
     edge_path = []
     for i in range(len(e_path)-1):
-        edge_path.append(G.get_edge_data(e_path[i], e_path[i+1])["road_id"])
+        edge_path.append(G.get_edge_data(e_path[i], e_path[i+1])['entry_waypoint'])
     
     return edge_path
         

@@ -3,7 +3,9 @@ import carla
 import networkx as nx
 import matplotlib.pyplot as plt
 import math
-from ..graph import *
+import sys
+sys.path.append('utils/')
+from graph import *
 
 def show_graph(graph):
     nx.draw(graph)
@@ -33,19 +35,21 @@ def print_lane(lane_id,topoloby, world):
     return lane
     
 
-def path_plan(world, planner, fixed = False):
+def path_plan(world, planner, fixed = False, start = 36, exit = 28):
     """
+    entrance lane 10
+    exit lane 8
     return a list with waypoints that can be connected into the path.
     """
+    wdmap = world.get_map()
+    topology = wdmap.get_topology()
+    resolution = 3
+    new_planner = planner(wdmap, resolution)
+    graph = new_planner._graph
     if fixed == True:
         #path_ids = [13, 45, 8, 40, 6, 32, 56]
         #path_ids = [35, 6, 30]
         path_ids = [16, 49, 6]
-        wdmap = world.get_map()
-        topology = wdmap.get_topology()
-        resolution = 3
-        new_planner = planner(wdmap, resolution)
-        graph = new_planner._graph
         # 2 driving, 3 parking lane
         """
         print_lane(35, topology, world)
@@ -61,20 +65,25 @@ def path_plan(world, planner, fixed = False):
             print(trace[1])
         
     else:
-        weighted_edge = [16, 49,]
-        start = 16          # start of the parking lot (should be node id)
-        exit = 49           # exit of the parking lot (should be node id)
+        weighted_edge = [4, 5, 7, 10]
+        start = start          # start of the parking lot (should be edge id)
+        exit = exit           # exit of the parking lot (should be edge id)
         #search_ask(world, road_ids, lanes=topology)
-        show_graph(graph)
-        print(node.__dict__ for node in graph.nodes())
-        for e in graph.edges():
-            if e[0].road_id in weighted_edge:
-                graph[e[0]][e[1]]["gain"] = 10
-                graph[e[0]][e[1]]["cost"] = 1
+        #show_graph(graph)
+        """
+        for node, attrs in graph.nodes(data=True):
+            print("Node {}: {}".format(node, attrs))
+        for u, v, attrs in graph.edges(data=True):
+            print("Edge {} {}: {}".format(u, v, int(attrs['entry_waypoint'].road_id)))
+        """
+        for u, v, attrs in graph.edges(data=True):
+            if  int(attrs['entry_waypoint'].road_id) in weighted_edge:
+                graph[u][v]["gain"] = 10
+                graph[u][v]["cost"] = 1
             else:
-                graph[e[0]][e[1]]["gain"] = 0
-                graph[e[0]][e[1]]["cost"] = 1
-        op_path = optimize_path(graph, start, exit)      # list of edge ids                        
+                graph[u][v]["gain"] = 0
+                graph[u][v]["cost"] = 1
+        path = optimize_path(graph, start, exit)      # list of edge ids                        
     return path
 
 def show_road_id(world, topology):
