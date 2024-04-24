@@ -2,6 +2,7 @@
 import carla
 import networkx as nx
 import matplotlib.pyplot as plt
+import math
 
 def show_graph(graph):
     nx.draw(graph)
@@ -36,7 +37,8 @@ def path_plan(world, planner):
     return a list with waypoints that can be connected into the path.
     """
     #path_ids = [13, 45, 8, 40, 6, 32, 56]
-    path_ids = [35, 6, 30]
+    path_ids = [16, 49, 6]
+
     wdmap = world.get_map()
     topology = wdmap.get_topology()
     resolution = 3
@@ -79,11 +81,12 @@ def path_plan(world, planner):
     """
 
 def eu_dist(p1, p2):
-    dist = (p1.x - p2.x)^2 + (p1.y - p2.y)^2
+    dist = math.sqrt(math.pow((p1.x - p2.x), 2) + math.pow((p1.y - p2.y),2))
+    return dist
         
 
 
-"""
+
 def search_ask(world, cur_loc, road_ids, lanes):
     road_ids = [14, 53, 18, 0, 10, 2, 16, 11, 7]
     status = [1, 1, 1, 0, 1, 1, 1, 1, 1]
@@ -101,6 +104,10 @@ def search_ask(world, cur_loc, road_ids, lanes):
         return None
     else:
         return [(spots[id], status[id]) for id in s_id]
-"""
-        
+
+def example_search(dest, cur_loc):
+    if eu_dist(dest, cur_loc) <= 0.5:
+        return dest
+    else:
+        return None
     

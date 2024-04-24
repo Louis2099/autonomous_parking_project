@@ -11,7 +11,7 @@ import cv2
 from ultralytics import YOLO
 from ultralytics.utils.plotting import Annotator 
 import Hybrid_A_Star
-from utils.path_planning import path_plan
+from utils.path_planning import *
 
 user = getpass.getuser() # computer user
 
@@ -79,7 +79,6 @@ def load_custom_map(xodr_path, fbx_path, client):
                 smooth_junctions=True,
                 enable_mesh_visibility=True))
         
-
         # Spawn parking lot
         import xml.etree.ElementTree as ET
         from pyproj import Proj, transform as pyproj_transform
@@ -160,10 +159,12 @@ class CarlaEnv():
         print("Maps:", self.client.get_available_maps())
 
         self.world = self.client.load_world(default_map)
+        print("Loaded world:", default_map)
         # xodr_path = r"D:\autonomous_parking_project\maps\parkinglot03.xodr"
         # fbx_path = None # r"D:\autonomous_parking_project\maps\parkinglot.fbx"
         # geojson_path = r"D:\autonomous_parking_project\maps\xparkinglot.geojson"
         # self.world = load_custom_map(xodr_path, fbx_path, self.client)
+
 
         self.actor_list = []
         self.blueprint_library = self.world.get_blueprint_library()
@@ -177,7 +178,8 @@ class CarlaEnv():
         self.spawn(n_vehicles, n_walkers)
         self.set_world_settings()
         self.init_sensors()
-        self.path_planning()
+        self.path_planning(custom_map=True)
+
 
 
         
@@ -366,7 +368,7 @@ class CarlaEnv():
     
     def draw_path(self, life_time=900.0):
       for point in self.path:
-         self.world.debug.draw_string(point.location, 'O', draw_shadow=False,
+         self.world.debug.draw_string(point, 'O', draw_shadow=False,
                                        color=carla.Color(r=255, g=0, b=0), life_time=life_time,
                                        persistent_lines=True)
          
@@ -441,41 +443,53 @@ class CarlaEnv():
         
         
         
-    def path_planning(self):
-        
-        self.ckp = [carla.Location(-38, -30, 0), 
-                     carla.Location(-38, -47, 0),
-                     carla.Location(-19, -47, 0),
-                     carla.Location(-19, -13, 0),
-                     carla.Location(-3, -13, 0),
-                     carla.Location(-3, -47, 0),
-                     carla.Location(16, -47, 0),
-                     carla.Location(16, -28, 0)
-                     ]
-        
-        #self.ckp = path_plan(self.world, planner) # series of waypoints
-        #self.ckp = [wp[0].transform.location for wp in self.ckp]
-        
-        self.path = []
-        step_size = 0.1
-        for ckp in self.ckp[:-1]:
-            delta_x = ckp.x - self.ckp[self.ckp.index(ckp)+1].x
-            delta_y = ckp.y - self.ckp[self.ckp.index(ckp)+1].y
-            if delta_x != 0:
-                yaw = 0
-                for i in range(int(abs(delta_x)/step_size)):
-                    self.path.append(carla.Transform(carla.Location(ckp.x + i*step_size, ckp.y, 0.5), carla.Rotation(0, yaw, 0)))
-            else:
-                if delta_y < 0:
-                    yaw = 90
-                    for i in range(int(abs(delta_y)/step_size)):
-                        self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y  + i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
+    def path_planning(self, custom_map=False):
+        if custom_map != True:
+            self.ckp = [carla.Location(-38, -30, 0), 
+                        carla.Location(-38, -47, 0),
+                        carla.Location(-19, -47, 0),
+                        carla.Location(-19, -13, 0),
+                        carla.Location(-3, -13, 0),
+                        carla.Location(-3, -47, 0),
+                        carla.Location(16, -47, 0),
+                        carla.Location(16, -28, 0)
+                        ]
+            self.path = []
+            step_size = 0.1
+            for ckp in self.ckp[:-1]:
+                delta_x = ckp.x - self.ckp[self.ckp.index(ckp)+1].x
+                delta_y = ckp.y - self.ckp[self.ckp.index(ckp)+1].y
+                if delta_x != 0:
+                    yaw = 0
+                    for i in range(int(abs(delta_x)/step_size)):
+                        self.path.append(carla.Transform(carla.Location(ckp.x + i*step_size, ckp.y, 0.5), carla.Rotation(0, yaw, 0)))
                 else:
-                    yaw = -90
-                    for i in range(int(abs(delta_y)/step_size)):
-                        self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y - i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
-
+                    if delta_y < 0:
+                        yaw = 90
+                        for i in range(int(abs(delta_y)/step_size)):
+                            self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y  + i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
+                    else:
+                        yaw = -90
+                        for i in range(int(abs(delta_y)/step_size)):
+                            self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y - i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
+        else:
+            self.ckp_wp = path_plan(self.world, planner) # series of waypoints
+            self.ckp = [wp[0].transform.location for wp in self.ckp_wp]
+            self.path = []
+            rd_id = [ckp[0].road_id for ckp in self.ckp_wp]
+            u_rd_id = []
+            for id in rd_id:
+                if id not in u_rd_id:
+                    u_rd_id.append(id)
+            idx = []
+            for id in u_rd_id:
+                idx.append(rd_id.index(id))
+            u_ckp_wp = [self.ckp_wp[id] for id in idx]
+            for wp in u_ckp_wp:
+                self.path.append(wp[0].next_until_lane_end(0.1))
+            self.path = [wp[0].transform.location for wp in self.path]
         self.draw_path()
+    
     
 
     
@@ -780,7 +794,7 @@ if __name__ == '__main__':
     xodr_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.xodr"
     #osm_to_xodr(osm_path)
     #['Town04','Town05']
-    default_map = 'Town05'
+    default_map = 'parkinglotgg_bake'
 
     if user == "wqiu2":
         port = 2000
@@ -800,7 +814,10 @@ if __name__ == '__main__':
     
     
     
-    env.mark_parking_spots()
+    #env.mark_parking_spots()
+    env.world.debug.draw_string(carla.Location(x=-28.40, y=-12.20, z=0), 'P', draw_shadow=False,
+                                       color=carla.Color(r=0, g=0, b=255), life_time=600,
+                                       persistent_lines=True)
     # env.drive(env.path)
     #env.vehicle.set_transform(carla.Transform(carla.Location(-38, -47, 0), carla.Rotation(0, 0, -90)))
     #env.drive()
@@ -810,6 +827,8 @@ if __name__ == '__main__':
     path_index = 0 # Which point vehicle is at in the path
     flag = False
 
+    
+    
     while True:
         env.world.tick()
         env.world.wait_for_tick()
@@ -828,21 +847,25 @@ if __name__ == '__main__':
                 continue # skip this iteration if obstacle detected
 
             point = env.path[path_index]
-            
-            
             Done = False
 
             # search for parking spot
-            
-            if point.rotation.yaw != 0:
-                result = env.search(point.location.x, point.location.y)
-                for spot in result:
-                    if spot != None:
-                        if spot[2] == 0:
-                            print("Parking spot found")
-                            print(result)
-                            Done = True
-                            break
+            # if point.rotation.yaw != 0:
+            #     result = env.search(point.location.x, point.location.y)
+            #     for spot in result:
+            #         if spot != None:
+            #             if spot[2] == 0:
+            #                 print("Parking spot found")
+            #                 print(result)
+            #                 Done = True
+            #                 break
+
+            # example search in custom map
+            dest = example_search(dest = carla.Location(x=-29.90, y=-12.20, z=0), cur_loc = point)
+
+            if dest != None:
+                Done = True
+
             
             if not Done:
                 try:
