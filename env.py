@@ -923,7 +923,7 @@ if __name__ == '__main__':
                         env.vehicle.set_transform(node)
 
                     time.sleep(2)
-                    
+
                     for node in reverse_path:
                         time.sleep(0.05)
                         env.vehicle.set_transform(node)
