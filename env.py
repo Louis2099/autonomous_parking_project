@@ -211,6 +211,7 @@ class CarlaEnv():
         # --------------
         ego_vehicle_bp = self.blueprint_library.filter('model3')[0]
         ego_vehicle_bp.set_attribute('role_name', 'hero')
+        ego_vehicle_bp.set_attribute('color', "255,0,0")
         spawn_point = self.spawn_points[0]
         spawn_point.location.z = 0.1 # Lower it to prevent spawn, bounce, and flipping over!
         
@@ -237,9 +238,12 @@ class CarlaEnv():
         vehicle_bps = self.blueprint_library.filter("vehicle.*")
         
         for i in range(n_vehicles):
-            vehicle_bp = random.choice(vehicle_bps)
+            # vehicle_bp = random.choice(vehicle_bps)
+            vehicle_bp = vehicle_bps[1]
+
             if vehicle_bp.has_attribute('color'):
-                color = random.choice(vehicle_bp.get_attribute('color').recommended_values)
+                # color = random.choice(vehicle_bp.get_attribute('color').recommended_values)
+                color = "0,0,0"
                 vehicle_bp.set_attribute('color', color)
             if vehicle_bp.has_attribute('driver_id'):
                 driver_id = random.choice(vehicle_bp.get_attribute('driver_id').recommended_values)
@@ -388,7 +392,7 @@ class CarlaEnv():
         return start_transform
         #return spawn_point
     
-    def mark_parking_spots(self, custom_map=True, free_spot = [4, 1]):
+    def mark_parking_spots(self, custom_map=True, free_spot = [5, 1]):
         if custom_map == False:
             self.width = 2.8
             self.length = 6
@@ -412,11 +416,11 @@ class CarlaEnv():
             self.row_x = row_x
             self.col_y = col_y
         else:
-            self.width = 3
+            self.width = 3.5
             self.length = 6
             self.vacancy_matrix = np.ones((7, 6))
-            row_x = np.arange(-14,6, 5.9, self.width)
-            col_y = [18.7, 15.7, 1.6, -1.4, -14.9, -17.9]
+            row_x = np.linspace(-14.6, 5.9, num=7, endpoint=True)
+            col_y = [21.7, 15.7, 4.6, -1.4, -11.9, -17.9]
             assert len(row_x) == 7
             self.row_x = row_x
             self.col_y = col_y
@@ -433,7 +437,7 @@ class CarlaEnv():
         # for testing
         
         self.target_spont = free_spot
-        self.location_mx = self.vacancy_matrix
+        self.location_mx = np.zeros((len(row_x), len(col_y), 3))
         for id_x in range(len(row_x)):
             for id_y in range(len(col_y)):
                 location = carla.Location(row_x[id_x], col_y[id_y], 0)
@@ -447,8 +451,10 @@ class CarlaEnv():
                     self.world.debug.draw_string(location, 'O', draw_shadow=False,
                                             color=carla.Color(r=255, g=0, b=0), life_time=600,
                                             persistent_lines=True)
-                self.location_mx[id_x][id_y] = location
-
+                #assert type(self.location_mx) == list
+                self.location_mx[id_x][id_y][:] = np.asarray([location.x, location.y, location.z])
+        
+        print(self.location_mx.shape)
         
         
         
@@ -484,7 +490,7 @@ class CarlaEnv():
                             self.path.append(carla.Transform(carla.Location(ckp.x, ckp.y - i*step_size, 0.5), carla.Rotation(0, yaw, 0)))
         else:
             self.ckp_wp = path_plan(self.world, planner) # series of waypoints
-            self.ckp = [wp[0].transform.location for wp in self.ckp_wp]
+            self.ckp = [wp.transform.location for wp in self.ckp_wp]
             self.path = []
             rd_id = [ckp.road_id for ckp 
                      in self.ckp_wp]
@@ -497,9 +503,9 @@ class CarlaEnv():
                 idx.append(rd_id.index(id))
             u_ckp_wp = [self.ckp_wp[id] for id in idx]
             for wp in u_ckp_wp:
-                self.path.append(wp.next_until_lane_end(0.1))
-            self.path = [wp.transform.location for wp in self.path]
-        self.draw_path()
+                self.path += wp.next_until_lane_end(0.15) # define the ego vehicle speed
+            self.path = [wp.transform for wp in self.path]
+        #self.draw_path()
     
     
 
@@ -805,14 +811,14 @@ if __name__ == '__main__':
     xodr_path = "/home/ubuntu/extreme_driving/jiaxingl/002/maps/p4.xodr"
     #osm_to_xodr(osm_path)
     #['Town04','Town05']
-    default_map = 'Town05'
+    default_map = 'parkinglotGG_bake'
 
     if user == "wqiu2":
         port = 2000
     else:
         port = 2000
     n_walkers = 0 # pedestrians
-    n_vehicles = 20
+    n_vehicles = 10
     tm_port = 2000
 
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
@@ -858,41 +864,39 @@ if __name__ == '__main__':
             result = example_search(spot_loc_mx=env.location_mx, 
                                     v_mx= env.vacancy_matrix, 
                                     cur_loc=point.location)
-            if result != None:
-                print("Parking spot found")
-                print(result)
+            if result[0] != 0:
+                if Done == False:
+                    print("Parking spot found")
                 Done = True
-                break
+                
 
-            # example search in custom map
-            dest = example_search(dest = carla.Location(x=-29.90, y=-12.20, z=0), cur_loc = point.location)
-
-            if dest != None:
-                Done = True
-
-            
             if not Done:
                 try:
                     env.vehicle.set_transform(point)
                     path_index +=1
-                       
-
                     # time.sleep(0.001)
                 except Exception as e:
                     print("Failed to move vehicle:", e)
                     continue
             else:
                 start = point # transform
-                target = carla.Location(float(spot[0]), float(spot[1]), 0.05)
-                print("Target YAW:", spot[3])
+                target = carla.Location(float(result[0]), float(result[1]), 0.05)
+                print("Target YAW:", result[3])
                 startnode = [point.location.x, point.location.y, np.deg2rad(point.rotation.yaw)]
-                goal = [float(spot[0]), float(spot[1]), np.deg2rad(spot[3])]  # Need to change to actual goal position
+                goal = [float(result[0]), float(result[1]), np.deg2rad(result[3])]  # Need to change to actual goal position
+                
                 ox = [] # x position list of Obstacles [m]
                 oy = [] # y position list of Obstacles [m]
                 ox.append(-1.5)
                 oy.append(12.9)
 
-                ox.append(1.3)
+                ox.append(-0.5)
+                oy.append(12.9)
+
+                ox.append(0.5)
+                oy.append(15.7)
+
+                ox.append(0.5)
                 oy.append(12.9)
 
                 ox.append(4.5)
@@ -901,21 +905,21 @@ if __name__ == '__main__':
                 ox.append(7.3)
                 oy.append(12.9)
 
-                ox.append(1.5)
-                oy.append(7.4)
+                ox.append(2.7)
+                oy.append(6)
 
-                ox.append(4.3)
-                oy.append(7.4)
+                # ox.append(4.3)
+                # oy.append(7.4)
 
                 'Visualize obstacles'
-                oxl = []
-                for i in range(len(ox)):
-                    oxl.append(carla.Location(ox[i], oy[i], 0))
+                # oxl = []
+                # for i in range(len(ox)):
+                #     oxl.append(carla.Location(ox[i], oy[i], 0))
 
-                for point in oxl:
-                    env.world.debug.draw_string(point, 'x', draw_shadow=False,
-                                        color=carla.Color(r=0, g=0, b=255), life_time=900,
-                                        persistent_lines=True)
+                # for point in oxl:
+                #     env.world.debug.draw_string(point, 'x', draw_shadow=False,
+                #                         color=carla.Color(r=0, g=0, b=255), life_time=900,
+                #                         persistent_lines=True)
 
 
                 if not flag:
@@ -932,6 +936,10 @@ if __name__ == '__main__':
                         time.sleep(0.05)
                         env.vehicle.set_transform(node)
                     
+                    for i in range(len(env.path)-path_index):
+                        time.sleep(0.05)
+                        env.vehicle.set_transform(env.path[path_index+i])
+
                     flag = True
                         
 

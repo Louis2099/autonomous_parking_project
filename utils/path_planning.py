@@ -128,15 +128,21 @@ def search_ask(world, cur_loc, road_ids, lanes):
         return [(spots[id], status[id]) for id in s_id]
 
 def example_search(spot_loc_mx, v_mx, cur_loc):
-    dist_mx = spot_loc_mx - cur_loc
+    serach_radius = 6
+    dist_mx = spot_loc_mx - np.asarray([cur_loc.x, cur_loc.y, cur_loc.z])
     dist = np.linalg.norm(dist_mx, axis=2)
-    assert dist.shape == spot_loc_mx.shape[:2]
-    s_id = np.where(dist <= 1.5)
-    # expect where reutn a list of index
-    print(s_id)
-    for id in s_id:
-        if v_mx[id[0]][id[1]] == 0:
-            return spot_loc_mx[id[0]][id[1]]
-        
-    return None
     
+    assert dist.shape == spot_loc_mx.shape[:2]
+    s_id = np.where(dist <= serach_radius)
+    # expect where reutn a list of index
+    # if len(s_id[0]) != 0:
+    #     print(s_id)
+    #     print(type(s_id), len(s_id))
+    if len(s_id[0]) ==0:
+        return [0,0,0]
+    
+    for i in range(len(s_id[0])):
+        if v_mx[s_id[0][i]][s_id[1][i]] == 0:
+            yaw = [90] if s_id[1][i] % 2 == 0 else [270]
+            return list(spot_loc_mx[s_id[0][i]][s_id[1][i]]) + yaw
+    return [0,0,0]
