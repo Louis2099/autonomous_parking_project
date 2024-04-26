@@ -6,6 +6,7 @@ import math
 import sys
 sys.path.append('utils/')
 from graph import *
+import numpy as np
 
 def show_graph(graph):
     nx.draw(graph)
@@ -126,9 +127,16 @@ def search_ask(world, cur_loc, road_ids, lanes):
     else:
         return [(spots[id], status[id]) for id in s_id]
 
-def example_search(dest, cur_loc):
-    if eu_dist(dest, cur_loc) <= 0.5:
-        return dest
-    else:
-        return None
+def example_search(spot_loc_mx, v_mx, cur_loc):
+    dist_mx = spot_loc_mx - cur_loc
+    dist = np.linalg.norm(dist_mx, axis=2)
+    assert dist.shape == spot_loc_mx.shape[:2]
+    s_id = np.where(dist <= 1.5)
+    # expect where reutn a list of index
+    print(s_id)
+    for id in s_id:
+        if v_mx[id[0]][id[1]] == 0:
+            return spot_loc_mx[id[0]][id[1]]
+        
+    return None
     
