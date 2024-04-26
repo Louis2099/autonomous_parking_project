@@ -885,15 +885,49 @@ if __name__ == '__main__':
                 goal = [float(spot[0]), float(spot[1]), np.deg2rad(spot[3])]  # Need to change to actual goal position
                 ox = [] # x position list of Obstacles [m]
                 oy = [] # y position list of Obstacles [m]
-                ox.append(float(spot[0])-5)
-                oy.append(float(spot[1]))
+                ox.append(-1.5)
+                oy.append(12.9)
+
+                ox.append(1.3)
+                oy.append(12.9)
+
+                ox.append(4.5)
+                oy.append(12.9)
+
+                ox.append(7.3)
+                oy.append(12.9)
+
+                ox.append(1.5)
+                oy.append(7.4)
+
+                ox.append(4.3)
+                oy.append(7.4)
+
+                'Visualize obstacles'
+                oxl = []
+                for i in range(len(ox)):
+                    oxl.append(carla.Location(ox[i], oy[i], 0))
+
+                for point in oxl:
+                    env.world.debug.draw_string(point, 'x', draw_shadow=False,
+                                        color=carla.Color(r=0, g=0, b=255), life_time=900,
+                                        persistent_lines=True)
+
 
                 if not flag:
                     parking_path = env.park(startnode, goal, ox, oy)
+                    reverse_path = parking_path[::-1]
 
                     for node in parking_path:
                         time.sleep(0.05)
                         env.vehicle.set_transform(node)
+
+                    time.sleep(2)
+                    
+                    for node in reverse_path:
+                        time.sleep(0.05)
+                        env.vehicle.set_transform(node)
+                    
                     flag = True
                         
 
