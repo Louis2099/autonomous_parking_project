@@ -343,7 +343,7 @@ class CarlaEnv():
         # Set starting location of the spectator camera
         spectator = self.world.get_spectator()
         transform = self.vehicle.get_transform()
-        spectator.set_transform(carla.Transform(transform.location + carla.Location(x=0,y=0, z=50),
+        spectator.set_transform(carla.Transform(transform.location + carla.Location(x=0,y=0, z=60),
         carla.Rotation(pitch=-90)))
 
         # Set weather of the world
@@ -392,7 +392,7 @@ class CarlaEnv():
         return start_transform
         #return spawn_point
     
-    def mark_parking_spots(self, custom_map=True, free_spot = [5, 1]):
+    def mark_parking_spots(self, custom_map=True):
         if custom_map == False:
             self.width = 2.8
             self.length = 6
@@ -419,11 +419,34 @@ class CarlaEnv():
             self.width = 3.5
             self.length = 6
             self.vacancy_matrix = np.ones((7, 6))
+            
+            # Defining free spots!
+            self.vacancy_matrix[5][1] = 0 # define the free spot
+            self.vacancy_matrix[1][2] = 0 
+            self.vacancy_matrix[3][2] = 0 
+            self.vacancy_matrix[4][2] = 0 
+
+            
             row_x = np.linspace(-14.6, 5.9, num=7, endpoint=True)
             col_y = [21.7, 15.7, 4.6, -1.4, -11.9, -17.9]
             assert len(row_x) == 7
             self.row_x = row_x
             self.col_y = col_y
+
+            vehicle_bp = self.blueprint_library.filter('vehicle.*')[3]
+            vehicle_bp.set_attribute('color', '79,78,156') # purple  
+
+            # Loop though each parking spot and spawn a car if it is occupied
+            for row in range(len(self.vacancy_matrix)):
+                for col in range(len(self.vacancy_matrix[row])):
+                    if self.vacancy_matrix[row][col] == 1:
+                        # Occupied parking spot, so spawn a car
+                        try:
+                            point = carla.Transform(location=carla.Location(row_x[row], col_y[col], 0.5), 
+                                                    rotation=carla.Rotation(yaw=np.random.choice([90.0,-90.0])))
+                            self.actor_list.append(self.world.try_spawn_actor(vehicle_bp, point))
+                        except Exception as e:
+                            print(f"Failed to spawn vehicle in parking spot ({row}, {col}): {e}")
         """
         while True:
             rand_x = random.randint(0, len(row_x)-1)
@@ -436,18 +459,15 @@ class CarlaEnv():
         """
         # for testing
         
-        self.target_spont = free_spot
         self.location_mx = np.zeros((len(row_x), len(col_y), 3))
         for id_x in range(len(row_x)):
             for id_y in range(len(col_y)):
                 location = carla.Location(row_x[id_x], col_y[id_y], 0)
-                if id_x == self.target_spont[0] and id_y == self.target_spont[1]:
-                    self.vacancy_matrix[id_x][id_y] = 0
+                if self.vacancy_matrix[id_x][id_y] == 0:
                     self.world.debug.draw_string(location, 'O', draw_shadow=False,
                                          color=carla.Color(r=0, g=255, b=0), life_time=600,
                                          persistent_lines=True)
                 else:
-                    self.vacancy_matrix[id_x][id_y] = 1
                     self.world.debug.draw_string(location, 'O', draw_shadow=False,
                                             color=carla.Color(r=255, g=0, b=0), life_time=600,
                                             persistent_lines=True)
@@ -881,7 +901,7 @@ if __name__ == '__main__':
             else:
                 start = point # transform
                 target = carla.Location(float(result[0]), float(result[1]), 0.05)
-                print("Target YAW:", result[3])
+                # print("Target YAW:", result[3])
                 startnode = [point.location.x, point.location.y, np.deg2rad(point.rotation.yaw)]
                 goal = [float(result[0]), float(result[1]), np.deg2rad(result[3])]  # Need to change to actual goal position
                 

@@ -38,7 +38,8 @@ def print_lane(lane_id,topoloby, world):
 
 def path_plan(world, planner, fixed = False, start = 36, exit = 28):
     """
-    entrance lane 10
+    entrance lane 10: 36
+    entrance lane 43: 37
     exit lane 8
     return a list with waypoints that can be connected into the path.
     """
