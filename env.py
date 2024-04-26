@@ -248,7 +248,7 @@ class CarlaEnv():
                 vehicle_bp.set_attribute('speed', 3)
             vehicle_bp.set_attribute('role_name', 'autopilot')
 
-            spawn_point = np.random.choice(self.spawn_points)
+            spawn_point = self.spawn_points[i%len(self.spawn_points)]
             spawn_point.location.z = 0.1 # Lower it to prevent spawn, bounce, and flipping over!
             # spawn the cars and set their autopilot and light state all together
             batch.append(carla.command.SpawnActor(vehicle_bp, spawn_point)
@@ -289,6 +289,7 @@ class CarlaEnv():
                     print("Walker has no speed")
                     walker_speed.append(0.0)
                 spawn_point = np.random.choice(self.spawn_points)
+                spawn_point.location.x += 3 # To prevent collision with vehicles
                 batch.append(carla.command.SpawnActor(walker_bp, spawn_point))
             # Apply the actors
             for result in self.client.apply_batch_sync(batch, True):
@@ -325,7 +326,8 @@ class CarlaEnv():
                 actor.start()
                 # set walk to random point
                 # actor.go_to_location(self.world.get_random_location_from_navigation())
-                actor.go_to_location(np.random.choice(self.spawn_points).location)
+                dest_loc = carla.Location(x=np.random.uniform(-40, 18), y=np.random.uniform(-50, -15), z=0)
+                actor.go_to_location(dest_loc)
                 # max speed
                 actor.set_max_speed(float(walker_speed[i]))
 
@@ -543,7 +545,7 @@ class CarlaEnv():
 
             # Run batched inference on a list of images
             rgb_img = rgba_img[:, :, :3]  # only want 3 channels
-            results = model(rgb_img)  # only want 3 channels
+            results = model(rgb_img, verbose=False)  # only want 3 channels
 
             yolo_results = []
             # Process results list
@@ -809,12 +811,10 @@ if __name__ == '__main__':
         port = 2000
     else:
         port = 2000
-    n_walkers = 20 # pedestrians
+    n_walkers = 0 # pedestrians
     n_vehicles = 20
     tm_port = 2000
 
-
-    # n_vehicles = 10
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
     #path = path_plan(env.world, planner) # series of waypoints
 
@@ -889,15 +889,49 @@ if __name__ == '__main__':
                 goal = [float(spot[0]), float(spot[1]), np.deg2rad(spot[3])]  # Need to change to actual goal position
                 ox = [] # x position list of Obstacles [m]
                 oy = [] # y position list of Obstacles [m]
-                ox.append(float(spot[0])-5)
-                oy.append(float(spot[1]))
+                ox.append(-1.5)
+                oy.append(12.9)
+
+                ox.append(1.3)
+                oy.append(12.9)
+
+                ox.append(4.5)
+                oy.append(12.9)
+
+                ox.append(7.3)
+                oy.append(12.9)
+
+                ox.append(1.5)
+                oy.append(7.4)
+
+                ox.append(4.3)
+                oy.append(7.4)
+
+                'Visualize obstacles'
+                oxl = []
+                for i in range(len(ox)):
+                    oxl.append(carla.Location(ox[i], oy[i], 0))
+
+                for point in oxl:
+                    env.world.debug.draw_string(point, 'x', draw_shadow=False,
+                                        color=carla.Color(r=0, g=0, b=255), life_time=900,
+                                        persistent_lines=True)
+
 
                 if not flag:
                     parking_path = env.park(startnode, goal, ox, oy)
+                    reverse_path = parking_path[::-1]
 
                     for node in parking_path:
                         time.sleep(0.05)
                         env.vehicle.set_transform(node)
+
+                    time.sleep(2)
+
+                    for node in reverse_path:
+                        time.sleep(0.05)
+                        env.vehicle.set_transform(node)
+                    
                     flag = True
                         
 
