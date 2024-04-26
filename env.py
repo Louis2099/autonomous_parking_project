@@ -249,7 +249,7 @@ class CarlaEnv():
                 vehicle_bp.set_attribute('speed', 3)
             vehicle_bp.set_attribute('role_name', 'autopilot')
 
-            spawn_point = np.random.choice(self.spawn_points)
+            spawn_point = self.spawn_points[i%len(self.spawn_points)]
             spawn_point.location.z = 0.1 # Lower it to prevent spawn, bounce, and flipping over!
             # spawn the cars and set their autopilot and light state all together
             batch.append(carla.command.SpawnActor(vehicle_bp, spawn_point)
@@ -290,6 +290,7 @@ class CarlaEnv():
                     print("Walker has no speed")
                     walker_speed.append(0.0)
                 spawn_point = np.random.choice(self.spawn_points)
+                spawn_point.location.x += 3 # To prevent collision with vehicles
                 batch.append(carla.command.SpawnActor(walker_bp, spawn_point))
             # Apply the actors
             for result in self.client.apply_batch_sync(batch, True):
@@ -326,7 +327,8 @@ class CarlaEnv():
                 actor.start()
                 # set walk to random point
                 # actor.go_to_location(self.world.get_random_location_from_navigation())
-                actor.go_to_location(np.random.choice(self.spawn_points).location)
+                dest_loc = carla.Location(x=np.random.uniform(-40, 18), y=np.random.uniform(-50, -15), z=0)
+                actor.go_to_location(dest_loc)
                 # max speed
                 actor.set_max_speed(float(walker_speed[i]))
 
@@ -535,7 +537,7 @@ class CarlaEnv():
 
             # Run batched inference on a list of images
             rgb_img = rgba_img[:, :, :3]  # only want 3 channels
-            results = model(rgb_img)  # only want 3 channels
+            results = model(rgb_img, verbose=False)  # only want 3 channels
 
             yolo_results = []
             # Process results list
@@ -802,12 +804,10 @@ if __name__ == '__main__':
         port = 2000
     else:
         port = 2000
-    n_walkers = 20 # pedestrians
+    n_walkers = 0 # pedestrians
     n_vehicles = 20
     tm_port = 2000
 
-
-    # n_vehicles = 10
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
     
     #spectate(env)
