@@ -36,7 +36,7 @@ N_STEER = 40             # number of steer command
 SB_COST = 3.0          # switch back penalty cost
 BACK_COST = 0.0        # backward penalty cost
 STEER_CHANGE_COST = 1.0  # steer angle change penalty cost
-STEER_COST = 3.0         # steer angle not zero cost
+STEER_COST = 5.0         # steer angle not zero cost
 H_COST = 0             # Heuristic cost
 
 

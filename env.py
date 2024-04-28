@@ -421,13 +421,15 @@ class CarlaEnv():
             self.vacancy_matrix = np.ones((7, 6))
             
             # Defining free spots!
-            self.vacancy_matrix[5][1] = 0 # define the free spot
-            self.vacancy_matrix[1][2] = 0 
-            self.vacancy_matrix[3][2] = 0 
-            self.vacancy_matrix[4][2] = 0 
+            # self.vacancy_matrix[5][1] = 0 # define the free spot
+            #self.vacancy_matrix[1][2] = 0 
+            #self.vacancy_matrix[3][2] = 0 
+            #self.vacancy_matrix[4][2] = 0 
+            #self.vacancy_matrix[5][3] = 0 
+
 
             
-            row_x = np.linspace(-14.6, 5.9, num=7, endpoint=True)
+            row_x = np.linspace(-14.8, 5.7, num=7, endpoint=True)
             col_y = [21.7, 15.7, 4.6, -1.4, -11.9, -17.9]
             assert len(row_x) == 7
             self.row_x = row_x
@@ -523,7 +525,7 @@ class CarlaEnv():
                 idx.append(rd_id.index(id))
             u_ckp_wp = [self.ckp_wp[id] for id in idx]
             for wp in u_ckp_wp:
-                self.path += wp.next_until_lane_end(0.15) # define the ego vehicle speed
+                self.path += wp.next_until_lane_end(0.2) # define the ego vehicle speed
             self.path = [wp.transform for wp in self.path]
         #self.draw_path()
     
@@ -838,7 +840,7 @@ if __name__ == '__main__':
     else:
         port = 2000
     n_walkers = 0 # pedestrians
-    n_vehicles = 10
+    n_vehicles = 9
     tm_port = 2000
 
     env = CarlaEnv(port, tm_port, default_map, n_vehicles, n_walkers)
@@ -907,6 +909,31 @@ if __name__ == '__main__':
                 
                 ox = [] # x position list of Obstacles [m]
                 oy = [] # y position list of Obstacles [m]
+
+                ox.append(float(result[0]))
+                oy.append(float(result[1])+8.5)
+
+                ox.append(float(result[0]))
+                oy.append(float(result[1])-8.5)
+
+                ox.append(float(result[0])-2.1)
+                oy.append(float(result[1]))
+
+                ox.append(float(result[0])+2.1)
+                oy.append(float(result[1]))
+
+                ox.append(float(result[0])-2.1)
+                oy.append(float(result[1])-2.8)
+
+                ox.append(float(result[0])+2.1)
+                oy.append(float(result[1])-2.8)
+
+                ox.append(float(result[0])-2.1)
+                oy.append(float(result[1])+2.8)
+
+                ox.append(float(result[0])+2.1)
+                oy.append(float(result[1])+2.8)
+
                 ox.append(-1.5)
                 oy.append(12.9)
 
@@ -932,14 +959,14 @@ if __name__ == '__main__':
                 # oy.append(7.4)
 
                 'Visualize obstacles'
-                # oxl = []
-                # for i in range(len(ox)):
-                #     oxl.append(carla.Location(ox[i], oy[i], 0))
+                #oxl = []
+                #for i in range(len(ox)):
+                #    oxl.append(carla.Location(ox[i], oy[i], 0))
 
-                # for point in oxl:
-                #     env.world.debug.draw_string(point, 'x', draw_shadow=False,
-                #                         color=carla.Color(r=0, g=0, b=255), life_time=900,
-                #                         persistent_lines=True)
+                #for point in oxl:
+                #    env.world.debug.draw_string(point, 'x', draw_shadow=False,
+                #                        color=carla.Color(r=0, g=0, b=255), life_time=900,
+                #                        persistent_lines=True)
 
 
                 if not flag:

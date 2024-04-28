@@ -36,7 +36,7 @@ def print_lane(lane_id,topoloby, world):
     return lane
     
 
-def path_plan(world, planner, fixed = False, start = 36, exit = 28):
+def path_plan(world, planner, fixed = False, start = 25, exit = 28):
     """
     entrance lane 10: 36
     entrance lane 43: 37
