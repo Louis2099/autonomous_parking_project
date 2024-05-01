@@ -28,16 +28,16 @@ import reeds_shepp as rs
 
 from Kinetic_Model import *
 
-XY_GRID_RESOLUTION = 0.5  # [m]
+XY_GRID_RESOLUTION = 0.2  # [m]
 YAW_GRID_RESOLUTION = np.deg2rad(2.0)  # [rad]
 MOTION_RESOLUTION = 0.08  # [m] path interpolate resolution
 N_STEER = 40             # number of steer command
 
-SB_COST = 0.0          # switch back penalty cost
+SB_COST = 3.0          # switch back penalty cost
 BACK_COST = 0.0        # backward penalty cost
-STEER_CHANGE_COST = 2.0  # steer angle change penalty cost
-STEER_COST = 0.0         # steer angle not zero cost
-H_COST = 3             # Heuristic cost
+STEER_CHANGE_COST = 1.0  # steer angle change penalty cost
+STEER_COST = 5.0         # steer angle not zero cost
+H_COST = 0             # Heuristic cost
 
 
 

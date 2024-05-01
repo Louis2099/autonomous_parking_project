@@ -2,7 +2,6 @@
 
 A* grid search
 
-See Wikipedia article (https://en.wikipedia.org/wiki/A*_search_algorithm)
 
 """
 
@@ -43,7 +42,7 @@ def calc_distance_heuristic(gx, gy, ox, oy, resolution, rr):
     ox: x position list of Obstacles [m]
     oy: y position list of Obstacles [m]
     resolution: grid resolution [m]
-    rr: robot radius[m]
+    rr: radius[m]
     """
 
     # Map the obstacle positions to the grid

@@ -75,6 +75,26 @@ def visualize_graph_and_path(G, path):
     plt.axis('off')
     plt.show()
 
+def optimize_path(G, start, exit):
+    paths = nx.all_simple_paths(G, start, exit)
+    for path in paths:
+        max_gain_ratio = 0
+        cost = 0
+        gain = 0
+        for i in range(len(path)-1):
+            data = G.get_edge_data(path[i], path[i + 1])
+            cost += data['cost']
+            gain += data['gain']
+        e_path = path if (gain / cost) > max_gain_ratio else None
+        max_gain_ratio = (gain / cost) if (gain / cost) > max_gain_ratio else max_gain_ratio
+    visualize_graph_and_path(G, e_path)
+    edge_path = []
+    for i in range(len(e_path)-1):
+        edge_path.append(G.get_edge_data(e_path[i], e_path[i+1])['entry_waypoint'])
+    
+    return edge_path
+        
+        
 
 if __name__ == '__main__':
     random.seed(0)
@@ -101,17 +121,17 @@ if __name__ == '__main__':
         visualize_graph_and_path(G, e_path)
     except:
         paths = nx.all_simple_paths(G, start, exit)
-        for path in paths:
-            max_gain_ratio = 0
-            cost = 0
-            gain = 0
-            for i in range(len(path)-1):
-                data = G.get_edge_data(path[i], path[i + 1])
-                cost += data['cost']
-                gain += data['gain']
-            e_path = path if (gain / cost) > max_gain_ratio else None
-            max_gain_ratio = (gain / cost) if (gain / cost) > max_gain_ratio else max_gain_ratio
-        visualize_graph_and_path(G, e_path)
+    for path in paths:
+        max_gain_ratio = 0
+        cost = 0
+        gain = 0
+        for i in range(len(path)-1):
+            data = G.get_edge_data(path[i], path[i + 1])
+            cost += data['cost']
+            gain += data['gain']
+        e_path = path if (gain / cost) > max_gain_ratio else None
+        max_gain_ratio = (gain / cost) if (gain / cost) > max_gain_ratio else max_gain_ratio
+    visualize_graph_and_path(G, e_path)
 
     print(f"max_gain_ratio: {max_gain_ratio}")
 
